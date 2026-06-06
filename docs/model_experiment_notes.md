@@ -27,6 +27,9 @@ Status: successful L40S model load and schema-constrained smoke request.
 | OpenAI response envelope | Confirmed via OpenAI Python SDK and `/v1/chat/completions` |
 | Required output fields | All five fields returned as valid JSON |
 | MTP initialization | Confirmed; 127/212 draft tokens accepted (59.9%) |
+| Vision projector | `mmproj-F16.gguf`, 927,607,360 bytes |
+| `scam_1.png` | High risk; 8.94 seconds; 1,019 prompt and 397 completion tokens |
+| `scam_2.png` | High risk; 9.07 seconds; 389 prompt and 500 completion tokens |
 
 ## Output contract
 
@@ -80,6 +83,21 @@ The assessment quality was useful for scam triage, but one run suggested
 `pakpost.com.pk` as an official site instead of the expected government domain.
 The app must not trust generated contact details or URLs; safe-next-step links
 should come from curated local data or verified official sources.
+
+## Image test
+
+The projector-enabled server successfully processed both screenshots through
+OpenAI SDK `image_url` messages while MTP remained active.
+
+- `scam_1.png`: recognized the fake failed-delivery message and highlighted the
+  suspicious link, urgency, and missing parcel details.
+- `scam_2.png`: read the Roman Urdu prize message, identified the iPhone/gift
+  lure and WhatsApp redirection, and extracted the visible phone numbers.
+
+The second response reached the configured 500-token completion limit even
+though llama-server reported `finish_reason=stop`. Production prompts should be
+shorter or the output budget should be increased slightly. Phone numbers and
+contact details extracted from screenshots must be treated as untrusted input.
 
 ## Product boundary
 

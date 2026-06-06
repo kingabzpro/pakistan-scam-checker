@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import os
 import json
 import subprocess
@@ -16,8 +17,12 @@ APP_NAME = "pakistan-scam-checker-qwen36-mtp"
 LLAMA_CPP_COMMIT = "5a69c974392020e514c3b2b2910bb92f847cb4c9"
 MODEL_REPO = "unsloth/Qwen3.6-27B-MTP-GGUF"
 MODEL_FILENAME = "Qwen3.6-27B-UD-Q4_K_XL.gguf"
+MMPROJ_FILENAME = "mmproj-F16.gguf"
 MODEL_DIR = Path("/models")
 MODEL_PATH = MODEL_DIR / MODEL_FILENAME
+MMPROJ_PATH = MODEL_DIR / MMPROJ_FILENAME
+TEST_IMAGE_DIR = Path("/test-images")
+LOCAL_IMAGE_DIR = Path(__file__).parent / "images"
 MODEL_VOLUME_NAME = "pakistan-scam-checker-qwen36-models"
 SERVER_PORT = 8080
 MINUTES = 60
@@ -59,6 +64,7 @@ llama_image = (
         ),
     )
     .uv_pip_install("openai==2.33.0")
+    .add_local_dir(LOCAL_IMAGE_DIR, TEST_IMAGE_DIR, copy=True)
 )
 
 
@@ -69,16 +75,21 @@ llama_image = (
 )
 def model_status() -> dict[str, object]:
     """Return whether the expected GGUF is already present in the Volume."""
-    if not MODEL_PATH.exists():
+    if not MODEL_PATH.exists() or not MMPROJ_PATH.exists():
         result: dict[str, object] = {
             "downloaded": False,
             "path": str(MODEL_PATH),
+            "mmproj_path": str(MMPROJ_PATH),
+            "model_exists": MODEL_PATH.exists(),
+            "mmproj_exists": MMPROJ_PATH.exists(),
         }
     else:
         result = {
             "downloaded": True,
             "path": str(MODEL_PATH),
             "size_bytes": MODEL_PATH.stat().st_size,
+            "mmproj_path": str(MMPROJ_PATH),
+            "mmproj_size_bytes": MMPROJ_PATH.stat().st_size,
         }
     print(result, flush=True)
     return result
@@ -95,16 +106,24 @@ def download_model() -> dict[str, object]:
 
     started_at = time.monotonic()
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    downloaded_path = hf_hub_download(
+    downloaded_model_path = hf_hub_download(
         repo_id=MODEL_REPO,
         filename=MODEL_FILENAME,
         local_dir=str(MODEL_DIR),
     )
+    downloaded_mmproj_path = hf_hub_download(
+        repo_id=MODEL_REPO,
+        filename=MMPROJ_FILENAME,
+        local_dir=str(MODEL_DIR),
+    )
     model_volume.commit()
-    path = Path(downloaded_path)
+    model_path = Path(downloaded_model_path)
+    mmproj_path = Path(downloaded_mmproj_path)
     result = {
-        "path": str(path),
-        "size_bytes": path.stat().st_size,
+        "path": str(model_path),
+        "size_bytes": model_path.stat().st_size,
+        "mmproj_path": str(mmproj_path),
+        "mmproj_size_bytes": mmproj_path.stat().st_size,
         "download_seconds": round(time.monotonic() - started_at, 2),
     }
     print(result, flush=True)
@@ -144,6 +163,8 @@ def server_command() -> list[str]:
         "/opt/llama.cpp/build/bin/llama-server",
         "--model",
         str(MODEL_PATH),
+        "--mmproj",
+        str(MMPROJ_PATH),
         "--host",
         "0.0.0.0",
         "--port",
@@ -170,6 +191,37 @@ def server_command() -> list[str]:
     ]
 
 
+def assessment_schema() -> dict[str, object]:
+    """Return the scam-assessment JSON schema used by smoke tests."""
+    return {
+        "type": "object",
+        "properties": {
+            "risk_label": {
+                "type": "string",
+                "enum": ["low", "medium", "high"],
+            },
+            "simple_explanation": {"type": "string"},
+            "red_flags": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "safe_next_steps": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
+            "reply_draft": {"type": "string"},
+        },
+        "required": [
+            "risk_label",
+            "simple_explanation",
+            "red_flags",
+            "safe_next_steps",
+            "reply_draft",
+        ],
+        "additionalProperties": False,
+    }
+
+
 @app.function(
     image=llama_image,
     gpu="L40S",
@@ -180,8 +232,8 @@ def smoke_test() -> dict[str, object]:
     """Exercise the OpenAI route inside the same GPU container."""
     from openai import OpenAI
 
-    if not MODEL_PATH.exists():
-        raise FileNotFoundError(f"{MODEL_PATH} is missing")
+    if not MODEL_PATH.exists() or not MMPROJ_PATH.exists():
+        raise FileNotFoundError("model or multimodal projector is missing")
 
     command = server_command()
     print("Starting llama-server:", " ".join(command), flush=True)
@@ -200,33 +252,6 @@ def smoke_test() -> dict[str, object]:
             capture_output=True,
             text=True,
         ).stdout.strip()
-        schema = {
-            "type": "object",
-            "properties": {
-                "risk_label": {
-                    "type": "string",
-                    "enum": ["low", "medium", "high"],
-                },
-                "simple_explanation": {"type": "string"},
-                "red_flags": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "safe_next_steps": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                },
-                "reply_draft": {"type": "string"},
-            },
-            "required": [
-                "risk_label",
-                "simple_explanation",
-                "red_flags",
-                "safe_next_steps",
-                "reply_draft",
-            ],
-            "additionalProperties": False,
-        }
         payload = {
             "model": "qwen3.6-27b-mtp",
             "messages": [
@@ -251,7 +276,7 @@ def smoke_test() -> dict[str, object]:
                 "json_schema": {
                     "name": "scam_assessment",
                     "strict": True,
-                    "schema": schema,
+                    "schema": assessment_schema(),
                 },
             },
         }
@@ -304,6 +329,109 @@ def smoke_test() -> dict[str, object]:
     gpu="L40S",
     volumes={str(MODEL_DIR): model_volume},
     timeout=30 * MINUTES,
+)
+def smoke_test_images() -> list[dict[str, object]]:
+    """Analyze both scam screenshots through the OpenAI-compatible vision API."""
+    from openai import OpenAI
+
+    if not MODEL_PATH.exists() or not MMPROJ_PATH.exists():
+        raise FileNotFoundError("model or multimodal projector is missing")
+
+    image_paths = [TEST_IMAGE_DIR / "scam_1.png", TEST_IMAGE_DIR / "scam_2.png"]
+    missing_images = [str(path) for path in image_paths if not path.exists()]
+    if missing_images:
+        raise FileNotFoundError("missing test images: " + ", ".join(missing_images))
+
+    command = server_command()
+    print("Starting llama-server:", " ".join(command), flush=True)
+    process = subprocess.Popen(command)
+    try:
+        wait_for_server(process, timeout_seconds=20 * MINUTES)
+        client = OpenAI(
+            api_key="not-used-by-llama-server",
+            base_url=f"http://127.0.0.1:{SERVER_PORT}/v1",
+            timeout=15 * MINUTES,
+            max_retries=0,
+        )
+        results: list[dict[str, object]] = []
+        for image_path in image_paths:
+            image_url = (
+                "data:image/png;base64,"
+                + base64.b64encode(image_path.read_bytes()).decode("ascii")
+            )
+            started_at = time.monotonic()
+            completion = client.chat.completions.create(
+                model="qwen3.6-27b-mtp",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "Analyze suspicious notices and messages for people in "
+                            "Pakistan. Read the image carefully and return only JSON "
+                            "matching the supplied schema. Do not invent URLs or "
+                            "contact details. The reply_draft must be polite, safe, "
+                            "and must not repeat insults or abusive language visible "
+                            "in the input."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Assess this screenshot for scam risk. Explain "
+                                    "the visible evidence and give safe next steps."
+                                ),
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url},
+                            },
+                        ],
+                    },
+                ],
+                temperature=0.2,
+                max_tokens=500,
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "scam_assessment",
+                        "strict": True,
+                        "schema": assessment_schema(),
+                    },
+                },
+                extra_body={
+                    "chat_template_kwargs": {"enable_thinking": False},
+                },
+            )
+            content = completion.choices[0].message.content
+            if not content:
+                raise RuntimeError(f"{image_path.name} returned empty content")
+            assessment = json.loads(content)
+            result = {
+                "image": image_path.name,
+                "seconds": round(time.monotonic() - started_at, 2),
+                "finish_reason": completion.choices[0].finish_reason,
+                "usage": completion.usage.model_dump() if completion.usage else {},
+                "assessment": assessment,
+            }
+            print(json.dumps(result, indent=2, ensure_ascii=False), flush=True)
+            results.append(result)
+        return results
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            process.kill()
+
+
+@app.function(
+    image=llama_image,
+    gpu="L40S",
+    volumes={str(MODEL_DIR): model_volume},
+    timeout=30 * MINUTES,
     startup_timeout=30 * MINUTES,
     scaledown_window=5 * MINUTES,
     min_containers=0,
@@ -317,9 +445,9 @@ def smoke_test() -> dict[str, object]:
 )
 def serve() -> None:
     """Start a private OpenAI-compatible llama-server endpoint."""
-    if not MODEL_PATH.exists():
+    if not MODEL_PATH.exists() or not MMPROJ_PATH.exists():
         raise FileNotFoundError(
-            f"{MODEL_PATH} is missing. Run `modal run "
+            "The model or multimodal projector is missing. Run `modal run "
             "experiments/modal_qwen36_mtp/modal_app.py::download_model` first."
         )
 

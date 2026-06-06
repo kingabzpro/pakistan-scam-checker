@@ -7,14 +7,18 @@ const elements = {
   dropZone: document.querySelector("#dropZone"),
   charCount: document.querySelector("#charCount"),
   button: document.querySelector("#analyzeButton"),
+  resetButton: document.querySelector("#resetButton"),
   error: document.querySelector("#formError"),
   status: document.querySelector("#modelStatus"),
   results: document.querySelector("#results"),
   risk: document.querySelector("#riskBadge"),
   source: document.querySelector("#resultSource"),
+  uploadHint: document.querySelector("#uploadHint"),
+  textHint: document.querySelector("#textHint"),
 };
 
 let imageDataUrl = "";
+let activeMode = null;
 
 async function callGradioApi(name, data) {
   const response = await fetch(`/gradio_api/call/${name}`, {
@@ -51,7 +55,7 @@ async function callGradioApi(name, data) {
 
 function setStatus(status) {
   if (!status) return;
-  elements.status.lastChild.textContent = status.label || "Model server not connected";
+  elements.status.lastChild.textContent = status.label || "Modal model unavailable";
   elements.status.classList.toggle("connected", Boolean(status.connected));
 }
 
@@ -59,13 +63,27 @@ async function loadStatus() {
   try {
     setStatus(await callGradioApi("status", []));
   } catch {
-    setStatus({ connected: false, label: "Model server not connected" });
+    setStatus({ connected: false, label: "Modal model unavailable" });
   }
 }
 
 function showError(message = "") {
   elements.error.textContent = message;
   elements.error.classList.toggle("visible", Boolean(message));
+}
+
+function setMode(mode) {
+  activeMode = mode;
+  const isImage = mode === "image";
+  const isText = mode === "text";
+
+  elements.text.disabled = isImage;
+  elements.dropZone.classList.toggle("disabled", isText);
+  elements.image.disabled = isText;
+
+  elements.uploadHint.classList.toggle("visible", isImage);
+  elements.textHint.classList.toggle("visible", isText);
+  elements.resetButton.classList.toggle("visible", Boolean(mode));
 }
 
 function setLoading(loading) {
@@ -88,15 +106,24 @@ function renderResult(payload) {
   if (!payload.ok) throw new Error(payload.error || "Unable to analyze this input.");
   const result = payload.assessment;
   setStatus(payload.status);
-  elements.risk.textContent = result.risk_label;
   elements.risk.className = `risk-badge risk-${result.risk_label.toLowerCase().replaceAll(" ", "-")}`;
+  elements.risk.textContent = result.risk_label;
   document.querySelector("#explanationText").textContent = result.simple_explanation;
-  document.querySelector("#replyText").textContent = result.reply_draft;
   renderList("#redFlagsList", result.red_flags);
   renderList("#nextStepsList", result.safe_next_steps);
+
+  const replyCard = document.querySelector("#replyCard");
+  const replyText = document.querySelector("#replyText");
+  if (result.reply_draft && result.reply_draft.trim()) {
+    replyText.textContent = result.reply_draft;
+    replyCard.hidden = false;
+  } else {
+    replyCard.hidden = true;
+  }
+
   elements.source.textContent = payload.source === "model"
-    ? "Analyzed by the configured model endpoint with local safety checks."
-    : "Demo result from local rule-based checks. No model server was connected.";
+    ? "Analyzed by the deployed Qwen model endpoint."
+    : "";
   elements.results.hidden = false;
   elements.results.scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -112,6 +139,7 @@ function useImage(file) {
     elements.preview.src = imageDataUrl;
     elements.dropZone.classList.add("has-image");
     showError();
+    setMode("image");
   });
   reader.readAsDataURL(file);
 }
@@ -124,6 +152,7 @@ elements.removeImage.addEventListener("click", (event) => {
   elements.image.value = "";
   elements.preview.removeAttribute("src");
   elements.dropZone.classList.remove("has-image");
+  setMode(null);
 });
 ["dragenter", "dragover"].forEach((name) => elements.dropZone.addEventListener(name, (event) => {
   event.preventDefault();
@@ -136,6 +165,12 @@ elements.removeImage.addEventListener("click", (event) => {
 elements.dropZone.addEventListener("drop", (event) => useImage(event.dataTransfer.files[0]));
 elements.text.addEventListener("input", () => {
   elements.charCount.textContent = `${elements.text.value.length.toLocaleString()} / 12,000`;
+  if (elements.text.value.trim().length === 1) {
+    setMode("text");
+  }
+  if (elements.text.value.trim().length === 0 && activeMode === "text") {
+    setMode(null);
+  }
 });
 
 document.querySelectorAll(".example-card").forEach((button) => {
@@ -143,8 +178,21 @@ document.querySelectorAll(".example-card").forEach((button) => {
     elements.text.value = button.dataset.example;
     elements.text.dispatchEvent(new Event("input"));
     elements.text.focus();
+    setMode("text");
     document.querySelector(".workspace").scrollIntoView({ behavior: "smooth" });
   });
+});
+
+elements.resetButton.addEventListener("click", () => {
+  imageDataUrl = "";
+  elements.image.value = "";
+  elements.preview.removeAttribute("src");
+  elements.dropZone.classList.remove("has-image");
+  elements.text.value = "";
+  elements.charCount.textContent = "0 / 12,000";
+  elements.results.hidden = true;
+  showError();
+  setMode(null);
 });
 
 elements.form.addEventListener("submit", async (event) => {

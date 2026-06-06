@@ -6,18 +6,19 @@
   <meta name="theme-color" content="#075f3b">
   <meta name="description" content="Check Pakistani notices and messages for common scam signals.">
   <title>Pakistan Notice Helper</title>
+  <link rel="icon" href="/static/logo.png" type="image/png">
   <link rel="stylesheet" href="/static/styles.css">
   <script src="/static/app.js" defer></script>
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Pakistan Notice Helper home">
-      <span class="brand-mark" aria-hidden="true">PK</span>
-      <span>Pakistan Notice Helper</span>
+      <span class="brand-mark"><img src="/static/logo.png" alt=""></span>
+      <span class="brand-name">Pakistan Notice Helper</span>
     </a>
     <div class="status-row">
       <span id="modelStatus" class="status-badge"><span class="status-dot"></span>Checking model</span>
-      <span class="privacy-badge">Private by default</span>
+      <span class="privacy-badge">Remote model</span>
     </div>
   </header>
 
@@ -29,12 +30,11 @@
         <p class="hero-text">Check suspicious bills, bank alerts, FBR-style messages, challans, courier notices, and SMS screenshots for common scam signals.</p>
         <div class="trust-note">
           <span class="shield" aria-hidden="true">✓</span>
-          <p><strong>Local-first privacy.</strong> Your input is processed in memory and is not saved by this app.</p>
+          <p><strong>Model-powered analysis.</strong> Your input is sent to the configured Modal endpoint and is not saved by this app.</p>
         </div>
       </div>
-      <div class="flag-panel" aria-hidden="true">
-        <div class="crescent">☾</div>
-        <p>Think first.<br>Verify safely.</p>
+      <div class="hero-image">
+        <img src="/static/hero.png" alt="">
       </div>
     </section>
 
@@ -44,7 +44,7 @@
           <p class="eyebrow">Free safety check</p>
           <h2 id="checkerTitle">Check a notice or message</h2>
         </div>
-        <p>No account or API key required in demo mode.</p>
+        <p>Analysis runs on the deployed Qwen multimodal model.</p>
       </div>
 
       <form id="noticeForm">
@@ -59,20 +59,27 @@
               <img id="imagePreview" alt="Selected notice preview">
               <button id="removeImage" class="text-button" type="button">Remove image</button>
             </label>
+            <div id="uploadHint" class="mode-hint"><span class="hint-icon">↑</span> Screenshot mode active — text input is locked</div>
           </div>
 
           <div class="field-card">
             <label class="field-label" for="noticeText"><span>2</span> Or paste the message</label>
             <textarea id="noticeText" maxlength="12000" placeholder="Paste the SMS, email, bill text, or notice here..."></textarea>
             <div class="field-meta"><span>English, Urdu, and Roman Urdu supported by compatible models</span><span id="charCount">0 / 12,000</span></div>
+            <div id="textHint" class="mode-hint"><span class="hint-icon">✎</span> Text mode active — image upload is locked</div>
           </div>
         </div>
 
         <div id="formError" class="form-error" role="alert"></div>
-        <button id="analyzeButton" class="primary-button" type="submit">
-          <span class="button-label">Check this notice</span>
-          <span class="spinner" aria-hidden="true"></span>
-        </button>
+        <div class="form-actions">
+          <button id="analyzeButton" class="primary-button" type="submit">
+            <span class="button-label">Check this notice</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+          <button id="resetButton" class="reset-button" type="button">
+            Start over
+          </button>
+        </div>
       </form>
     </section>
 
@@ -112,7 +119,7 @@
           <div class="card-title"><span>✓</span><h3>Safe next steps</h3><button class="copy-button" data-copy="nextStepsList">Copy</button></div>
           <ol id="nextStepsList"></ol>
         </article>
-        <article class="result-card reply-card">
+        <article id="replyCard" class="result-card reply-card">
           <div class="card-title"><span>↗</span><h3>Polite reply draft</h3><button class="copy-button" data-copy="replyText">Copy</button></div>
           <p id="replyText"></p>
         </article>

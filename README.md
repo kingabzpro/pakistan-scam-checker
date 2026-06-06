@@ -1,180 +1,188 @@
+---
+title: Pakistan Notice Helper
+emoji: 🇵🇰
+colorFrom: green
+colorTo: emerald
+sdk: gradio
+sdk_version: 6.15.1
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # Pakistan Notice Helper
 
-A local-first AI app that helps people in Pakistan identify suspicious messages, scam emails, fake notices, and phishing attempts. Accepts both **images** (screenshots) and **text** (pasted messages or emails).
+Pakistan Notice Helper is a local-first safety assistant for confusing or
+suspicious Pakistani notices, bills, SMS messages, bank alerts, FBR-style
+messages, challans, and courier/customs messages. It accepts pasted text and
+screenshots, then returns:
 
-## Problem
+- **Risk label:** Looks normal, Verify first, Suspicious, or Likely scam
+- A simple English explanation
+- Red flags found
+- Safe next steps
+- A polite reply draft
 
-Millions of Pakistanis receive confusing or fraudulent messages daily:
+The interface is a custom mobile-first frontend served by
+[`gradio.Server`](https://www.gradio.app/main/guides/server-mode). Gradio
+provides queueing, API routes, and Hugging Face Spaces hosting without exposing
+a default Gradio UI.
 
-**SMS & WhatsApp Scams**
-- Fake FBR tax refund SMS
-- Counterfeit e-challan traffic fines
-- Phishing courier delivery notifications (Pakistan Post, TCS, Leopards)
-- Bank fraud alerts and fake reward points
-- Easypaisa / JazzCash wallet scams
-- WhatsApp account hijacking attempts
+> **Pakistan Notice Helper does not provide official verification. It checks
+> common scam signals and gives safe next steps. Always verify through official
+> websites or helplines before making payments or sharing personal
+> information.**
 
-**Email Scams**
-- Fake FBR tax assessment emails with malicious attachments
-- Bank phishing emails asking to "verify account"
-- Prize/lottery winner notification emails
-- Job offer emails requesting upfront fees
-- Fake university admission or scholarship emails
-- Customs/duty payment emails with phishing links
+## Run locally
 
-**Text-Based Fraud**
-- Job scams via WhatsApp/Telegram (task-based scams)
-- Romance and investment scams on social media
-- Fake customer support messages
-- SIM swap and OTP phishing attempts
-
-Most people cannot tell real from fake. This tool helps them decide.
-
-## How It Works
-
-```
-User pastes text / uploads screenshot / forwards email
-        |
-        v
-   Small multimodal model (local, no cloud)
-        |
-        v
-   Returns:
-   - Risk label (Likely scam / Verify first / Looks normal)
-   - Red flags found
-   - Simple explanation in English + Urdu
-   - Safe next steps
-   - Draft reply
-```
-
-### Supported Input Types
-
-| Input Type | Examples |
-|---|---|
-| **Image** | SMS screenshots, email screenshots, WhatsApp screenshots, fake website screenshots |
-| **Text** | Pasted SMS text, email body, WhatsApp message, job offer, any suspicious message |
-
-## Project Structure
-
-```
-pakistan-scam-checker/
-├── data/
-│   └── examples.jsonl          # Labeled scam examples (images + text)
-├── sample_inputs/              # Real scam message screenshots (public sources)
-├── docs/
-│   ├── research_notes.md       # Scam pattern research & official advisories
-│   └── model_experiment_notes.md
-├── experiments/
-│   └── modal_qwen36_mtp/      # Qwen3.6 MTP model experiments on Modal
-└── README.md
-```
-
-## Dataset
-
-`data/examples.jsonl` contains labeled examples sourced from public posts on Reddit, PTA advisories, security research reports, and user-reported scams.
-
-Each entry includes:
-| Field | Description |
-|---|---|
-| `image` | Path to screenshot in `sample_inputs/` (for image examples) |
-| `text` | Raw message text (for text examples) |
-| `input_type` | `image` or `text` |
-| `category` | FBR, bank, wallet, courier, traffic_challan, email, job, unknown |
-| `risk_label` | Likely scam / Suspicious / Verify first / Looks normal |
-| `source_type` | reddit / official_advisory / synthetic / other |
-| `source_url` | Public URL where the example was found |
-| `description` | What the message or screenshot shows |
-| `red_flags` | Array of warning signs |
-| `simple_explanation` | Plain language explanation of the scam |
-| `safe_next_steps` | What the user should do |
-| `reply_draft` | Suggested reply if needed |
-
-### Categories Covered
-
-| Category | Input Types | Examples |
-|---|---|---|
-| Courier scams | image, text | Fake Pakistan Post, TCS delivery SMS |
-| E-Challan scams | image, text | Fake traffic fine from non-9915 numbers |
-| Bank scams | image, text | HBL/UBL fraud alerts, smishing |
-| FBR tax scams | image, text | Fake tax refund messages and emails |
-| Email phishing | text | Fake bank emails, prize notifications |
-| Job scams | text | WhatsApp/Telegram task scams, fake offers |
-| Wallet scams | text | Easypaisa / JazzCash fraud |
-| WhatsApp scams | image, text | Verification code hijacking |
-| Utility scams | text | K-Electric, SNGC disconnection threats |
-| University scams | text | Fake HEC scholarship announcements |
-
-## Getting Started
+Python 3.10 or newer is recommended.
 
 ```bash
-git clone https://github.com/kingabzpro/pakistan-scam-checker.git
-cd pakistan-scam-checker
+python -m pip install -r requirements.txt
+python app.py
 ```
 
-### Prerequisites
+Open `http://127.0.0.1:7860`. No secret or model server is required for demo
+mode.
 
-- Python 3.10+
-- llama.cpp (for local model inference)
-- A multimodal GGUF model (e.g., Qwen3.6-27B-MTP)
+Useful checks:
 
-### Quick Test
-
-```python
-import json
-
-with open("data/examples.jsonl") as f:
-    for line in f:
-        example = json.loads(line)
-        input_type = example.get("input_type", "image")
-        label = example["risk_label"]
-        cat = example["category"]
-        desc = example.get("description", example.get("text", ""))[:80]
-        print(f"[{input_type}] [{label}] {cat}: {desc}...")
+```bash
+python -m py_compile app.py
+python app.py --self-test
+python app.py --test-endpoint
 ```
 
-## Model Experiments
+The last command requires a configured endpoint.
 
-See `docs/model_experiment_notes.md` for details on running Qwen3.6-27B-MTP on Modal with an L40S GPU.
+## Model configuration
 
-Key findings:
-- Model loads in ~12 seconds on L40S (48GB VRAM)
-- Inference in ~5 seconds for structured JSON output
-- MTP draft token acceptance: ~60%
-- Vision projector included for image understanding
-- Text-only inputs are faster (no image processing)
+The app uses the standard OpenAI Python SDK as a client for an
+OpenAI-compatible endpoint. It does not call OpenAI cloud APIs by default.
 
-## Official Reporting Channels
+| Variable | Purpose |
+| --- | --- |
+| `MODEL_BASE_URL` | Deployed or local endpoint root, with or without `/v1` |
+| `MODEL_NAME` | Model name or server model ID |
+| `MODEL_API_KEY` | Optional endpoint API key |
+| `MODEL_TIMEOUT_SECONDS` | Optional request timeout; default is 180 seconds |
+| `MODAL_PROXY_KEY` | Optional Modal proxy authentication key |
+| `MODAL_PROXY_SECRET` | Optional Modal proxy authentication secret |
 
-If you receive a suspicious message in Pakistan:
+Example:
 
-| Organization | Contact | For |
-|---|---|---|
-| PTA (Telecom) | complaints.pta.gov.pk | SMS/WhatsApp scams |
-| FIA Cyber Crime | Helpline 1991 | Online fraud, phishing |
-| SBP (Banking) | 021-111-727-727 | Bank fraud |
-| FBR (Tax) | fbr.gov.pk | Tax-related scams |
-| National CERT | pkcert.gov.pk | Cybersecurity incidents |
-| HEC | hec.gov.pk | Fake education scams |
+```powershell
+$env:MODEL_BASE_URL = "http://127.0.0.1:8080"
+$env:MODEL_NAME = "qwen3.6-27b-mtp"
+$env:MODEL_API_KEY = ""
+python app.py
+```
 
-## Contributing
+See [local model setup](docs/local_model_setup.md) and
+[endpoint testing](docs/model_endpoint_testing.md).
 
-This is a hackathon project. Contributions welcome:
+## Operating modes
 
-1. Add more scam examples (screenshots or text) to `data/examples.jsonl`
-2. Add corresponding screenshots to `sample_inputs/`
-3. Improve model prompts and detection accuracy
-4. Add Urdu language support
-5. Add more email scam examples
+**Connected model mode:** sends text and optional image data to the configured
+multimodal OpenAI-compatible endpoint and validates its structured response.
 
-**Important:** Do not upload private personal data. All examples must be from public sources or anonymized recreations.
+**Rule-based fallback:** checks pasted text locally for credential requests,
+urgency, threats, suspicious links, personal mobile numbers, impersonation,
+prizes/refunds, unusual payments, and advance fees.
+
+**Demo/sample mode:** loads without endpoint configuration. Example cards and
+text checks remain usable. Image-only analysis asks the user to paste visible
+text because the Space intentionally does not include OCR.
+
+If a configured endpoint is unavailable or returns invalid output, the app
+shows **Model server not connected** and falls back without crashing.
+
+## Architecture
+
+```text
+Custom HTML/CSS/JavaScript frontend
+        |
+        | Gradio POST + SSE protocol
+        v
+Queued gradio.Server backend
+        |
+        | OpenAI Python SDK
+        v
+Deployed/local OpenAI-compatible endpoint
+        |
+        v
+unsloth/Qwen3.6-27B-MTP-GGUF
+```
+
+All frontend assets are local. The app has no runtime CDN, analytics, web API,
+OCR, MCP, OpenAI Agents SDK, or mandatory cloud dependency.
+
+## Hugging Face Spaces
+
+Push this repository to a new Gradio Space. The metadata at the top of this
+README pins Gradio and launches `app.py`. Add endpoint settings under **Space
+Settings → Variables and secrets** only when model-backed analysis is needed:
+
+- Variables: `MODEL_BASE_URL`, `MODEL_NAME`
+- Secret: `MODEL_API_KEY` when required
+- Secrets: `MODAL_PROXY_KEY`, `MODAL_PROXY_SECRET` for the current private
+  Modal experiment
+
+The Space remains functional without any of these values.
+
+## Privacy and limitations
+
+- Submitted text and images are processed in memory and are not saved by this
+  app.
+- The `traces/` directory contains only a placeholder; runtime tracing is off.
+- A configured remote endpoint receives the submitted content. Review that
+  endpoint's privacy policy before using it with sensitive notices.
+- Do not upload private personal data unless you trust the configured endpoint.
+- No automated result proves that a notice is genuine or fraudulent.
+- Image analysis requires a multimodal endpoint with its vision projector.
+
+## Project structure
+
+```text
+app.py
+requirements.txt
+README.md
+FIELD_NOTES.md
+docs/
+  local_model_setup.md
+  model_endpoint_testing.md
+  research_notes.md
+  model_experiment_notes.md
+data/
+  examples.jsonl
+sample_inputs/
+traces/
+static/
+  index.html
+  styles.css
+  app.js
+experiments/
+  modal_qwen36_mtp/
+```
+
+Existing public and synthetic examples in `data/examples.jsonl` cover courier,
+traffic challan, bank, FBR, wallet, job, utility, WhatsApp, and education scam
+patterns. Source screenshots are stored under `sample_inputs/`.
+
+## Official reporting channels
+
+Use contact details that you navigate to independently:
+
+- [PTA Complaint Management System](https://complaint.pta.gov.pk/)
+- [FIA Complaint Portal](https://complaint.fia.gov.pk/)
+- [State Bank of Pakistan](https://www.sbp.org.pk/)
+- [Federal Board of Revenue](https://www.fbr.gov.pk/)
+- The official bank, courier, utility, traffic authority, or government website
+  relevant to the notice
+
+Never call a number or open a link merely because it appears inside the message
+being checked.
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
-
-## Acknowledgments
-
-- PTA, FIA, FBR, PSCA for public scam advisories
-- Reddit r/pakistan and r/PakistaniTech communities
-- NCERT Pakistan for cybersecurity advisories
-- Security researchers at Resecurity and Group-IB
+MIT. See [LICENSE](LICENSE).

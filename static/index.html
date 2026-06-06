@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#075f3b">
+  <meta name="description" content="Check Pakistani notices and messages for common scam signals.">
+  <title>Pakistan Notice Helper</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Pakistan Notice Helper home">
+      <span class="brand-mark" aria-hidden="true">PK</span>
+      <span>Pakistan Notice Helper</span>
+    </a>
+    <div class="status-row">
+      <span id="modelStatus" class="status-badge"><span class="status-dot"></span>Checking model</span>
+      <span class="privacy-badge">Private by default</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Understand before you act</p>
+        <h1>Does this notice look <span>safe?</span></h1>
+        <p class="hero-text">Check suspicious bills, bank alerts, FBR-style messages, challans, courier notices, and SMS screenshots for common scam signals.</p>
+        <div class="trust-note">
+          <span class="shield" aria-hidden="true">✓</span>
+          <p><strong>Local-first privacy.</strong> Your input is processed in memory and is not saved by this app.</p>
+        </div>
+      </div>
+      <div class="flag-panel" aria-hidden="true">
+        <div class="crescent">☾</div>
+        <p>Think first.<br>Verify safely.</p>
+      </div>
+    </section>
+
+    <section class="workspace" aria-labelledby="checkerTitle">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Free safety check</p>
+          <h2 id="checkerTitle">Check a notice or message</h2>
+        </div>
+        <p>No account or API key required in demo mode.</p>
+      </div>
+
+      <form id="noticeForm">
+        <div class="input-grid">
+          <div class="field-card upload-card">
+            <div class="field-label"><span>1</span> Upload a screenshot</div>
+            <label id="dropZone" class="drop-zone" for="imageInput">
+              <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp">
+              <span class="upload-icon" aria-hidden="true">↑</span>
+              <strong>Drop an image here</strong>
+              <small>or tap to browse PNG, JPG, or WebP</small>
+              <img id="imagePreview" alt="Selected notice preview">
+              <button id="removeImage" class="text-button" type="button">Remove image</button>
+            </label>
+          </div>
+
+          <div class="field-card">
+            <label class="field-label" for="noticeText"><span>2</span> Or paste the message</label>
+            <textarea id="noticeText" maxlength="12000" placeholder="Paste the SMS, email, bill text, or notice here..."></textarea>
+            <div class="field-meta"><span>English, Urdu, and Roman Urdu supported by compatible models</span><span id="charCount">0 / 12,000</span></div>
+          </div>
+        </div>
+
+        <div id="formError" class="form-error" role="alert"></div>
+        <button id="analyzeButton" class="primary-button" type="submit">
+          <span class="button-label">Check this notice</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+      </form>
+    </section>
+
+    <section class="examples" aria-labelledby="examplesTitle">
+      <div class="section-heading compact">
+        <div><p class="eyebrow">Try an example</p><h2 id="examplesTitle">Common messages in Pakistan</h2></div>
+      </div>
+      <div class="example-grid">
+        <button class="example-card" data-example="PAKISTAN POST: Your parcel address is incomplete. Pay Rs. 85 today at http://pakpost-delivery.xyz or the parcel will be destroyed.">
+          <span class="example-icon">PK</span><span><strong>Courier fee</strong><small>Urgent parcel payment link</small></span>
+        </button>
+        <button class="example-card" data-example="FBR REFUND: You are eligible for Rs 42,500. Submit your CNIC and bank card details at the link today to receive payment.">
+          <span class="example-icon">FBR</span><span><strong>Tax refund</strong><small>Unexpected refund request</small></span>
+        </button>
+        <button class="example-card" data-example="HBL Security: Your account will be suspended. Share the OTP sent to your phone with our support team immediately.">
+          <span class="example-icon">OTP</span><span><strong>Bank alert</strong><small>Security code request</small></span>
+        </button>
+      </div>
+    </section>
+
+    <section id="results" class="results" aria-live="polite" hidden>
+      <div class="result-header">
+        <div><p class="eyebrow">Safety assessment</p><h2>What we found</h2></div>
+        <div id="riskBadge" class="risk-badge"></div>
+      </div>
+      <p id="resultSource" class="result-source"></p>
+      <div class="result-grid">
+        <article class="result-card explanation-card">
+          <div class="card-title"><span>i</span><h3>Simple explanation</h3><button class="copy-button" data-copy="explanationText">Copy</button></div>
+          <p id="explanationText"></p>
+        </article>
+        <article class="result-card">
+          <div class="card-title"><span>!</span><h3>Red flags found</h3><button class="copy-button" data-copy="redFlagsList">Copy</button></div>
+          <ul id="redFlagsList"></ul>
+        </article>
+        <article class="result-card">
+          <div class="card-title"><span>✓</span><h3>Safe next steps</h3><button class="copy-button" data-copy="nextStepsList">Copy</button></div>
+          <ol id="nextStepsList"></ol>
+        </article>
+        <article class="result-card reply-card">
+          <div class="card-title"><span>↗</span><h3>Polite reply draft</h3><button class="copy-button" data-copy="replyText">Copy</button></div>
+          <p id="replyText"></p>
+        </article>
+      </div>
+    </section>
+
+    <section class="disclaimer">
+      <strong>Important safety note</strong>
+      <p>Pakistan Notice Helper does not provide official verification. It checks common scam signals and gives safe next steps. Always verify through official websites or helplines before making payments or sharing personal information.</p>
+    </section>
+  </main>
+
+  <footer><span>Built for safer digital decisions in Pakistan.</span><span>Never share OTPs, PINs, passwords, or CVVs.</span></footer>
+</body>
+</html>

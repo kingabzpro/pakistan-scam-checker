@@ -347,8 +347,26 @@ These images are from official advisories and are publicly shared for awareness 
 - CERT Advisory: https://pkcert.gov.pk/advisory/26/1.pdf
   - Description: Detailed advisory on WhatsApp account hijacking methods including OTP scams, call forwarding exploits, and phishing links
 
+### Image Dataset (Updated)
+The `data/examples.jsonl` file now contains 27 image-based examples with the following structure:
+- `image`: Path to the screenshot in `sample_inputs/`
+- `category`: traffic_challan, courier, FBR, bank, wallet, unknown
+- `risk_label`: Likely scam, Suspicious, Verify first, Looks normal
+- `source_type`: reddit, official_advisory, other
+- `source_url`: Public URL where the image was found
+- `description`: What the screenshot shows
+- `red_flags`: Array of warning signs visible in the image
+
+### Image Categories in Dataset
+- **E-Challan Scams (3 images)**: Fake traffic fine SMS from non-9915 numbers
+- **Courier Scams (18 images)**: Pakistan Post, TCS, Leopards fake delivery SMS
+- **Bank Scams (3 images)**: HBL, generic bank fraud alerts
+- **FBR Tax Scams (2 images)**: Fake tax refund messages
+- **WhatsApp Scams (1 image)**: Verification code request scam
+
 ### Image Usage Notes
-- All downloaded images are from official government advisories and security research reports
+- All downloaded images are from official government advisories, security research reports, and public Reddit/social media posts
 - These are shared publicly for awareness and educational purposes
 - No private or personal data is included in these images
-- For the hackathon app, consider creating synthetic recreations based on these patterns rather than using the original images directly
+- Images show real scam patterns that Pakistani citizens encounter daily
+- For the hackathon app, use these as training data for scam detection

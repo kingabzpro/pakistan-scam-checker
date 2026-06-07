@@ -15,6 +15,40 @@ that a message is officially genuine or fraudulent.
 This scope fits the **Backyard AI** track: it addresses a specific local safety
 problem with a model small enough to run through `llama.cpp`.
 
+## Why I built it this way
+
+I wanted to build with a model I already understood instead of spending most
+of the hackathon comparing unfamiliar models. I use Qwen3.6 27B locally for
+coding and other everyday tasks, so I already trusted its instruction
+following, output quality, and speed. That familiarity made it the practical
+choice for this project: I knew how it behaved, what hardware it needed, and
+where its limitations were.
+
+The MTP variant was especially appealing because speculative multi-token
+prediction can improve generation speed when the draft tokens are accepted. In
+my own local workloads, quantized Qwen builds have been practical on an RTX
+3090. With lighter quantizations and suitable settings, I have seen some
+workloads use roughly 16 GB of VRAM and approach 150 tokens per second. Those
+personal observations are not presented as a universal benchmark: context
+length, quantization, GPU offload, prompt shape, and output length all change
+VRAM use and tokens per second. The repository uses the larger 17.9 GB
+`Q4_K_XL` file, and its reproducible measurements are the Modal L40S results
+recorded below.
+
+I chose Modal because it provides a serverless GPU endpoint that scales to zero
+after inactivity and starts again on demand. That is a strong cost model for a
+demo with irregular traffic because compute is paid for when the deployment is
+actually used instead of keeping a GPU running continuously. Persistent
+Volumes avoid downloading the 17.9 GB model on every cold start, and the
+measured warm-volume load was about 12 seconds.
+
+Control was another reason for using Modal. I build and pin the `llama.cpp`
+runtime, choose the model and quantization, manage the endpoint, and protect it
+with proxy authentication. Inputs are not sent to a third-party hosted LLM
+API. Modal still processes the request on its infrastructure, so this is
+self-managed inference rather than fully local inference, but the model-serving
+stack and API behavior remain under my control.
+
 ## Product decisions
 
 - Use simple English rather than legal or security terminology.
@@ -54,6 +88,21 @@ Key measured results:
 
 The full setup and measurements are documented in
 [the model experiment notes](docs/model_experiment_notes.md).
+
+## Building with Codex
+
+Codex helped build most of the project, especially the custom frontend,
+Gradio Server integration, tests, trace pipeline, documentation, and repeated
+UI refinements. I was surprised by how quickly a fully custom HTML, CSS, and
+JavaScript interface could be connected to Gradio's queue and SSE protocol.
+This let me keep Hugging Face Spaces compatibility without settling for the
+default Gradio component layout.
+
+I used Codex as an engineering collaborator rather than only a code generator.
+It inspected the existing repository, implemented changes, ran tests, checked
+the live Space metadata, and helped keep the Modal and `llama.cpp`
+documentation consistent with the deployed system. The public Git history
+includes Codex co-author attribution for that work.
 
 ## Gradio and Space architecture
 
@@ -102,6 +151,19 @@ links, identifiers, generated explanations, reply text, errors, and
 credentials. Upload failures do not block the user response; pending JSONL
 shards remain available for retry.
 
+I designed the trace format this way because personal information can leak
+from more than the original input. A model explanation, reply draft, extracted
+phone number, URL, or exception can repeat private details even when the raw
+message is omitted. The trace serializer therefore does not publish the user's
+input, the model's free-form reasoning, the generated reply, or the final
+response text. It derives a limited set of redacted categories, booleans,
+counts, and fixed summaries instead.
+
+This minimizes what the application publishes, but it is not a claim that
+model inference itself is anonymous. Live text and images still travel to the
+private Modal endpoint for analysis. Users are warned not to submit sensitive
+personal data, and public trace sharing can be disabled before a request.
+
 The dataset and schema are published at
 [build-small-hackathon/pakistan-notice-helper-traces](https://huggingface.co/datasets/build-small-hackathon/pakistan-notice-helper-traces).
 
@@ -128,6 +190,21 @@ accurate personal detail does not establish authenticity.
 - The app does not query government, bank, courier, or telecom databases.
 - A result must always be confirmed through independently located official
   channels before payment or disclosure of personal information.
+
+## Future direction
+
+The next major feature would be an agentic verification workflow. After
+understanding the submitted text or screenshot, the agent could search the web
+for current scam warnings, identify the organization being impersonated, and
+compare claims against independently discovered official sources. It could
+then present the evidence it found alongside the model's assessment.
+
+That workflow needs strict boundaries. It must never follow links or call
+numbers supplied by the suspicious message as if they were trusted. Search
+results would need source ranking, domain verification, citations, and a clear
+distinction between evidence and inference. The current project stops at
+triage because adding web access without those controls could make a safety
+tool less safe.
 
 ## References
 

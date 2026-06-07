@@ -36,6 +36,116 @@ REQUIRED_FIELDS = {
     "safe_next_steps",
     "reply_draft",
 }
+EXAMPLE_ASSESSMENTS: dict[str, dict[str, Any]] = {
+    "text-courier": {
+        "risk_label": "Likely scam",
+        "simple_explanation": (
+            "This message uses an urgent parcel fee and an unofficial-looking "
+            "link to pressure the recipient into paying."
+        ),
+        "red_flags": [
+            "Unexpected delivery fee",
+            "Threat that the parcel will be destroyed",
+            "Link does not clearly belong to Pakistan Post",
+        ],
+        "safe_next_steps": [
+            "Do not open the link or make the payment.",
+            "Check the parcel through the courier's independently found official website.",
+            "Report the message as spam or phishing.",
+        ],
+        "reply_draft": "",
+    },
+    "text-fbr": {
+        "risk_label": "Likely scam",
+        "simple_explanation": (
+            "An unexpected tax refund that asks for CNIC and bank-card details "
+            "is a common identity and payment phishing pattern."
+        ),
+        "red_flags": [
+            "Unexpected refund offer",
+            "Request for CNIC and card details",
+            "Pressure to act today",
+        ],
+        "safe_next_steps": [
+            "Do not submit personal or banking information.",
+            "Check your tax account by navigating to the official FBR website yourself.",
+            "Report the sender through an official complaint channel.",
+        ],
+        "reply_draft": "",
+    },
+    "text-bank": {
+        "risk_label": "Likely scam",
+        "simple_explanation": (
+            "A bank or support representative should never ask you to share an "
+            "OTP. The account-suspension threat is intended to create panic."
+        ),
+        "red_flags": [
+            "Direct request for an OTP",
+            "Threat of immediate account suspension",
+            "Pressure to bypass normal bank security",
+        ],
+        "safe_next_steps": [
+            "Do not share the OTP or reply to the sender.",
+            "Contact the bank using the number on your card or official app.",
+            "Change credentials immediately if an OTP or password was already shared.",
+        ],
+        "reply_draft": "",
+    },
+    "image-courier": {
+        "risk_label": "Likely scam",
+        "simple_explanation": (
+            "This sample screenshot shows a fake delivery-fee message designed "
+            "to send the recipient to an untrusted payment link."
+        ),
+        "red_flags": [
+            "Unexpected courier payment request",
+            "Urgent delivery language",
+            "Untrusted link in the message",
+        ],
+        "safe_next_steps": [
+            "Do not use the link in the screenshot.",
+            "Verify any shipment through the courier's official tracking page.",
+            "Block and report the sender.",
+        ],
+        "reply_draft": "",
+    },
+    "image-mobile": {
+        "risk_label": "Likely scam",
+        "simple_explanation": (
+            "This sample screenshot uses a fake mobile-related offer or alert "
+            "to prompt unsafe contact or disclosure of personal information."
+        ),
+        "red_flags": [
+            "Unsolicited mobile-related claim",
+            "Pressure to respond outside an official app",
+            "Unverified sender details",
+        ],
+        "safe_next_steps": [
+            "Do not reply or share account information.",
+            "Check the claim in the mobile operator's official app or website.",
+            "Report and block the sender.",
+        ],
+        "reply_draft": "",
+    },
+    "image-traffic": {
+        "risk_label": "Likely scam",
+        "simple_explanation": (
+            "This sample screenshot imitates an e-challan notice and pressures "
+            "the recipient to use an unverified payment route."
+        ),
+        "red_flags": [
+            "Unexpected traffic fine",
+            "Unverified payment instructions",
+            "Urgency intended to discourage independent checks",
+        ],
+        "safe_next_steps": [
+            "Do not pay through the message link.",
+            "Check the challan on the relevant official traffic authority website.",
+            "Report the message if no official record exists.",
+        ],
+        "reply_draft": "",
+    },
+}
 
 SYSTEM_PROMPT = """You help people in Pakistan assess notices and messages.
 Return only JSON matching the supplied schema. Use simple, calm English.
@@ -251,10 +361,20 @@ def call_model(text: str, image_data_url: str) -> dict[str, Any]:
     raise RuntimeError("Model request ended without a response.")
 
 
-def analyze_notice(text: str = "", image_data_url: str = "") -> dict[str, Any]:
+def analyze_notice(
+    text: str = "", image_data_url: str = "", example_id: str = ""
+) -> dict[str, Any]:
     """Analyze supplied text/image using the configured model only."""
     text = (text or "").strip()
     image_data_url = image_data_url or ""
+    example_id = (example_id or "").strip()
+    if example_id in EXAMPLE_ASSESSMENTS:
+        return {
+            "ok": True,
+            "assessment": dict(EXAMPLE_ASSESSMENTS[example_id]),
+            "status": model_status(),
+            "source": "cached_example",
+        }
     if not text and not image_data_url:
         return {
             "ok": False,
@@ -298,8 +418,10 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.api(name="analyze", description="Assess a notice for common scam signals.", concurrency_limit=1)
-def analyze_api(text: str = "", image_data_url: str = "") -> dict[str, Any]:
-    return analyze_notice(text, image_data_url)
+def analyze_api(
+    text: str = "", image_data_url: str = "", example_id: str = ""
+) -> dict[str, Any]:
+    return analyze_notice(text, image_data_url, example_id)
 
 
 @app.api(name="status", description="Return model and privacy status.", queue=False)
@@ -351,6 +473,10 @@ def run_self_tests() -> None:
         }
     )
     assert inappropriate["reply_draft"] == ""
+    cached = analyze_notice(example_id="text-bank")
+    assert cached["ok"] is True
+    assert cached["source"] == "cached_example"
+    assert cached["assessment"]["risk_label"] == "Likely scam"
     assert analyze_notice("", "")["ok"] is False
     try:
         normalize_assessment({"risk_label": "Looks normal"})

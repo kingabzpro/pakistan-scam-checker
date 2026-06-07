@@ -19,6 +19,7 @@ const elements = {
 
 let imageDataUrl = "";
 let activeMode = null;
+let activeExampleId = "";
 
 async function callGradioApi(name, data) {
   const response = await fetch(`/gradio_api/call/${name}`, {
@@ -124,13 +125,16 @@ function renderResult(payload) {
 
   elements.source.textContent = payload.source === "model"
     ? "Analyzed by the deployed Qwen model endpoint."
-    : "";
+    : payload.source === "cached_example"
+      ? "Loaded from a precomputed example assessment. No model request was made."
+      : "";
   elements.results.hidden = false;
   elements.results.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function useImage(file) {
   if (!file) return;
+  activeExampleId = "";
   const allowed = ["image/png", "image/jpeg", "image/webp"];
   if (!allowed.includes(file.type)) return showError("Use a PNG, JPG, or WebP image.");
   if (file.size > 8 * 1024 * 1024) return showError("Please choose an image smaller than 8 MB.");
@@ -150,6 +154,7 @@ elements.removeImage.addEventListener("click", (event) => {
   event.preventDefault();
   event.stopPropagation();
   imageDataUrl = "";
+  activeExampleId = "";
   elements.image.value = "";
   elements.preview.removeAttribute("src");
   elements.dropZone.classList.remove("has-image");
@@ -165,6 +170,7 @@ elements.removeImage.addEventListener("click", (event) => {
 }));
 elements.dropZone.addEventListener("drop", (event) => useImage(event.dataTransfer.files[0]));
 elements.text.addEventListener("input", () => {
+  activeExampleId = "";
   elements.charCount.textContent = `${elements.text.value.length.toLocaleString()} / 12,000`;
   if (elements.text.value.trim().length === 1) {
     setMode("text");
@@ -183,6 +189,7 @@ document.querySelectorAll(".example-card").forEach((button) => {
         const reader = new FileReader();
         reader.addEventListener("load", () => {
           imageDataUrl = String(reader.result);
+          activeExampleId = button.dataset.exampleId || "";
           elements.preview.src = imageDataUrl;
           elements.dropZone.classList.add("has-image");
           showError();
@@ -196,6 +203,7 @@ document.querySelectorAll(".example-card").forEach((button) => {
     } else if (button.dataset.example) {
       elements.text.value = button.dataset.example;
       elements.text.dispatchEvent(new Event("input"));
+      activeExampleId = button.dataset.exampleId || "";
       elements.text.focus();
       setMode("text");
       document.querySelector(".workspace").scrollIntoView({ behavior: "smooth" });
@@ -205,6 +213,7 @@ document.querySelectorAll(".example-card").forEach((button) => {
 
 elements.resetButton.addEventListener("click", () => {
   imageDataUrl = "";
+  activeExampleId = "";
   elements.image.value = "";
   elements.preview.removeAttribute("src");
   elements.dropZone.classList.remove("has-image");
@@ -234,7 +243,11 @@ elements.form.addEventListener("submit", async (event) => {
 
   setLoading(true);
   try {
-    renderResult(await callGradioApi("analyze", [elements.text.value, imageDataUrl]));
+    const submittedImage = activeExampleId ? "" : imageDataUrl;
+    renderResult(await callGradioApi(
+      "analyze",
+      [elements.text.value, submittedImage, activeExampleId],
+    ));
   } catch (error) {
     showError(error.message || "The request could not be completed.");
   } finally {

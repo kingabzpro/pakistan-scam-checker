@@ -84,9 +84,14 @@ See [local model setup](docs/local_model_setup.md) and
 The app sends text and optional image data to the configured multimodal
 OpenAI-compatible endpoint and validates its structured response.
 
-There is no rule-based or sample fallback. If credentials are missing, the
-endpoint is unavailable, or the model returns invalid output, the app displays
-a clear error and does not manufacture an assessment.
+The six built-in text and screenshot examples use precomputed assessments.
+Trying those examples does not call or wake the Modal endpoint. Editing an
+example or uploading a different image switches back to normal model analysis.
+
+There is no rule-based or sample fallback for user-submitted input. If
+credentials are missing, the endpoint is unavailable, or the model returns
+invalid output, the app displays a clear error and does not manufacture an
+assessment.
 
 ## Architecture
 

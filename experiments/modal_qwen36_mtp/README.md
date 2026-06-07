@@ -6,10 +6,10 @@ with CUDA-enabled `llama-server` on one Modal L40S. It exposes llama.cpp's
 OpenAI-compatible `/v1/chat/completions` route without calling OpenAI or any
 cloud LLM API.
 
-This deployment is only an infrastructure and model-compatibility experiment.
-The hackathon application remains local-first and offline-capable. A Hugging
-Face Space may be offered as a fallback, but Modal is not the intended primary
-application backend.
+This deployment is the hackathon application's primary inference backend. The
+Hugging Face Space sends text and screenshots to this proxy-authenticated
+endpoint, while the same application code can target a local `llama-server`
+through environment-variable overrides.
 
 ## Configuration
 

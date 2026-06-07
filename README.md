@@ -8,6 +8,12 @@ sdk_version: 6.15.1
 app_file: app.py
 pinned: false
 license: mit
+tags:
+  - backyard-ai
+  - build-small-hackathon
+  - gradio
+  - llama.cpp
+  - modal
 ---
 
 # Pakistan Notice Helper
@@ -32,6 +38,26 @@ a default Gradio UI.
 > common scam signals and gives safe next steps. Always verify through official
 > websites or helplines before making payments or sharing personal
 > information.**
+
+## Build Small Hackathon
+
+This is a **Backyard AI** project built for the
+[Build Small Hackathon](https://huggingface.co/build-small-hackathon). It
+addresses a common local problem: people receive convincing payment notices,
+bank alerts, courier messages, challans, and government impersonation scams
+but may not know which details are unsafe.
+
+- **Space:** [build-small-hackathon/pakistan-notice-helper](https://huggingface.co/spaces/build-small-hackathon/pakistan-notice-helper)
+- **Source:** [kingabzpro/pakistan-notice-helper](https://github.com/kingabzpro/pakistan-notice-helper)
+- **Model:** `unsloth/Qwen3.6-27B-MTP-GGUF` (27B parameters)
+- **Inference:** CUDA-enabled `llama.cpp` on a Modal L40S
+- **Interface:** custom mobile-first frontend on `gradio.Server`
+- **Open traces:** [privacy-safe trace dataset](https://huggingface.co/datasets/build-small-hackathon/pakistan-notice-helper-traces)
+- **Build report:** [field notes](FIELD_NOTES.md)
+
+The project targets the Backyard AI main track, OpenAI Codex Track, Modal
+Awards, and the Llama Champion, Off-Brand, Sharing is Caring, and Field Notes
+bonus quests.
 
 ## Run locally
 
@@ -112,12 +138,18 @@ Queued gradio.Server backend
         v
 Deployed/local OpenAI-compatible endpoint
         |
+        | Modal L40S + CUDA llama-server
+        v
+llama.cpp runtime
+        |
         v
 unsloth/Qwen3.6-27B-MTP-GGUF
 ```
 
 All frontend assets are local. The app has no runtime CDN, analytics, OCR, MCP,
-or OpenAI Agents SDK. Analysis currently depends on the deployed Modal model.
+or OpenAI Agents SDK. The OpenAI Python package is only an HTTP client for the
+OpenAI-compatible `llama-server` endpoint; requests are not sent to OpenAI.
+Analysis currently depends on the deployed Modal model.
 
 ## Sharing is Caring: Open Traces
 
@@ -156,13 +188,16 @@ python -m traces.scripts.upload_trace_shards --dry-run
 See [the dataset card](traces/dataset_card.md) for the schema, privacy
 policy, provenance, and limitations.
 
-## Hugging Face Spaces
+## Deployment
 
-Push this repository to a new Gradio Space. The metadata at the top of this
-README pins Gradio and launches `app.py`. Add `MODAL_PROXY_KEY` and
-`MODAL_PROXY_SECRET` under **Space Settings → Secrets**. The endpoint URL and
-model name are built into the app; `MODEL_BASE_URL` and `MODEL_NAME` remain
-available as overrides for a future local deployment.
+The app is deployed as a Gradio Space under the Build Small Hackathon
+organization. The metadata at the top of this README pins Gradio, identifies
+the Backyard AI track, and launches `app.py`.
+
+Add `MODAL_PROXY_KEY` and `MODAL_PROXY_SECRET` under
+**Space Settings → Secrets**. The endpoint URL and model name are built into
+the app; `MODEL_BASE_URL` and `MODEL_NAME` remain available as overrides for a
+future local deployment.
 
 ## Privacy and limitations
 

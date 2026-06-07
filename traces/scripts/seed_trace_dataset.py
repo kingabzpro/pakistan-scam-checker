@@ -69,7 +69,7 @@ def main() -> int:
     args = parser.parse_args()
     records = build_seed_records()
     content = "".join(
-        json.dumps(record, sort_keys=True, ensure_ascii=True) + "\n"
+        json.dumps(record, ensure_ascii=True) + "\n"
         for record in records
     )
     if args.dry_run:

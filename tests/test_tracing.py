@@ -72,7 +72,6 @@ class TraceTests(unittest.TestCase):
             image_record["result_summary"],
         )
         self.assertIn("Strong scam indicators", image_record["result_summary"])
-        self.assertEqual(image_record["input_storage"], "image_description_only")
         for removed in (
             "pipeline_steps",
             "cache",
@@ -85,6 +84,23 @@ class TraceTests(unittest.TestCase):
             "image_size_bucket",
             "language_hint",
             "modal",
+            "exception_text_stored",
+            "identifiers_stored",
+            "input_storage",
+            "raw_image_stored",
+            "raw_input_stored",
+            "raw_model_output_stored",
+            "red_flag_count",
+            "reply_draft_returned",
+            "signal_account_threat",
+            "signal_challan",
+            "signal_cnic",
+            "signal_courier",
+            "signal_credentials",
+            "signal_link",
+            "signal_otp",
+            "signal_payment",
+            "signal_refund_or_prize",
         ):
             self.assertNotIn(removed, image_record)
 
@@ -104,11 +120,11 @@ class TraceTests(unittest.TestCase):
             "No completed assessment result was available",
             text_record["result_summary"],
         )
-        self.assertEqual(text_record["input_storage"], "redacted_text")
         self.assertFalse(any(
             isinstance(value, (dict, list))
             for value in text_record.values()
         ))
+        self.assertEqual(next(iter(text_record)), "trace_id")
 
     def test_opt_out_does_not_queue_trace(self) -> None:
         with patch("app.queue_trace") as queue_mock:

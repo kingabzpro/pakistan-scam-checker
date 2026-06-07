@@ -132,7 +132,8 @@ images use a fixed `image: ...` description without OCR or image storage. The
 trace also records category, urgency, fixed signals, result counts, and a
 deterministic `result_summary` explaining the scam pattern and risk label.
 All trace columns are flat scalar values; no dataset cell contains a nested
-dictionary.
+dictionary. Detected signals are combined into the readable `scam_tactics`
+column.
 It never stores raw messages, screenshots, links, detected identifiers, model
 explanations, reply text, exceptions, or credentials.
 

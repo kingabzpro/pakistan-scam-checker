@@ -33,7 +33,7 @@ def main() -> int:
                 raise RuntimeError(f"{path}: {'; '.join(errors)}")
             records.append(record)
     content = "".join(
-        json.dumps(record, sort_keys=True, ensure_ascii=True) + "\n"
+        json.dumps(record, ensure_ascii=True) + "\n"
         for record in records
     )
     if args.dry_run:

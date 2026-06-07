@@ -41,16 +41,13 @@ and convert it into allow-listed categories, booleans, buckets, and counts.
 - `result_summary`: deterministic summary of the mapped pattern, whether it is
   known or unclassified, and why the risk label matters
 - `scam_tactics`: readable comma-separated tactics
-- Flat boolean signal columns such as `signal_link`, `signal_payment`, and
-  `signal_credentials`
-- Flat result columns such as `risk_label`, `red_flag_count`, and
+- Flat result columns such as `risk_label`, `safe_next_step_count`, and
   `reply_draft_policy`
-- `input_storage`: `redacted_text` or `image_description_only`
-- Flat privacy flags confirming that raw input, images, identifiers, model
-  output, and exception text are not stored
 
 Every dataset cell is a scalar string, number, or boolean. No column contains a
 dictionary or nested object, which keeps the Hugging Face table easy to read.
+`trace_id` is the first serialized column, and all detected boolean signals are
+combined into the single `scam_tactics` category column.
 
 Records do not contain pipeline steps, cache fields, app commits, failure
 details, request source, schema versions, size buckets, language hints, or

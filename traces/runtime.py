@@ -230,11 +230,6 @@ def build_input_profile(text: str, image_data_url: str, example_id: str = "") ->
         "input_category": category,
         "urgency": signals["urgency"],
         "scam_tactics": ", ".join(tactics) if tactics else "none",
-        **{
-            f"signal_{name}": enabled
-            for name, enabled in signals.items()
-            if name != "urgency"
-        },
     }
 
 
@@ -259,12 +254,10 @@ def build_trace_record(
         **input_profile,
         "result_summary": result_summary(risk_label, category, signals),
         "risk_label": risk_label,
-        "red_flag_count": min(len(assessment.get("red_flags", [])), 50),
         "safe_next_step_count": min(
             len(assessment.get("safe_next_steps", [])),
             50,
         ),
-        "reply_draft_returned": bool(assessment.get("reply_draft")),
         "reply_draft_policy": (
             "allowed"
             if risk_label in {"Verify first", "Suspicious"}
@@ -272,16 +265,6 @@ def build_trace_record(
             if risk_label != "none"
             else "not_applicable"
         ),
-        "input_storage": (
-            "redacted_text"
-            if input_profile["input"].startswith("text: ")
-            else "image_description_only"
-        ),
-        "raw_input_stored": False,
-        "raw_image_stored": False,
-        "raw_model_output_stored": False,
-        "exception_text_stored": False,
-        "identifiers_stored": False,
     }
 
 
@@ -296,31 +279,16 @@ def validate_trace(record: Any) -> list[str]:
         "input_category",
         "urgency",
         "scam_tactics",
-        "signal_otp",
-        "signal_cnic",
-        "signal_credentials",
-        "signal_link",
-        "signal_payment",
-        "signal_refund_or_prize",
-        "signal_courier",
-        "signal_challan",
-        "signal_account_threat",
         "result_summary",
         "risk_label",
-        "red_flag_count",
         "safe_next_step_count",
-        "reply_draft_returned",
         "reply_draft_policy",
-        "input_storage",
-        "raw_input_stored",
-        "raw_image_stored",
-        "raw_model_output_stored",
-        "exception_text_stored",
-        "identifiers_stored",
     }
     missing = required - record.keys()
     if missing:
         errors.append("Missing fields: " + ", ".join(sorted(missing)))
+    if record and next(iter(record)) != "trace_id":
+        errors.append("trace_id must be the first column.")
     input_value = record.get("input")
     if not (
         isinstance(input_value, str)
@@ -338,22 +306,6 @@ def validate_trace(record: Any) -> list[str]:
         errors.append("Result summary must be a string.")
     if record.get("risk_label") not in RISK_LABELS:
         errors.append("Invalid risk label.")
-    private_storage_flags = (
-        "raw_input_stored",
-        "raw_image_stored",
-        "raw_model_output_stored",
-        "exception_text_stored",
-        "identifiers_stored",
-    )
-    if any(
-        record.get(key) is not False for key in private_storage_flags
-    ):
-        errors.append("Raw/private storage flags must all be false.")
-    if record.get("input_storage") not in {
-        "redacted_text",
-        "image_description_only",
-    }:
-        errors.append("Invalid input storage category.")
     if any(isinstance(value, (dict, list)) for value in record.values()):
         errors.append("Trace columns must contain scalar values only.")
     forbidden_keys = {
@@ -368,6 +320,23 @@ def validate_trace(record: Any) -> list[str]:
         "image_size_bucket",
         "language_hint",
         "modal",
+        "exception_text_stored",
+        "identifiers_stored",
+        "input_storage",
+        "raw_image_stored",
+        "raw_input_stored",
+        "raw_model_output_stored",
+        "red_flag_count",
+        "reply_draft_returned",
+        "signal_account_threat",
+        "signal_challan",
+        "signal_cnic",
+        "signal_courier",
+        "signal_credentials",
+        "signal_link",
+        "signal_otp",
+        "signal_payment",
+        "signal_refund_or_prize",
         "raw_input",
         "raw_text",
         "image_data_url",
@@ -493,7 +462,7 @@ class TracePublisher:
         final_path = PENDING_DIR / filename
         temporary_path = final_path.with_suffix(".tmp")
         content = "".join(
-            json.dumps(record, sort_keys=True, ensure_ascii=True) + "\n"
+            json.dumps(record, ensure_ascii=True) + "\n"
             for record in accepted
         )
         temporary_path.write_text(content, encoding="utf-8")

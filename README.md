@@ -1,31 +1,3 @@
----
-title: Pakistan Notice Helper
-emoji: 📬
-colorFrom: green
-colorTo: green
-sdk: gradio
-sdk_version: 6.16.0
-app_file: app.py
-pinned: true
-license: mit
-tags:
-- backyard-ai
-- build-small-hackathon
-- gradio
-- llama.cpp
-- modal
-- qwen
-- gguf
-- multimodal
-- vision-language-model
-- scam-detection
-- online-safety
-- pakistan
-- roman-urdu
-- openai-compatible
-short_description: Check notices and messages for scam/fraud risks.
----
-
 # Pakistan Notice Helper
 
 Pakistan Notice Helper is a Qwen3.6-powered safety assistant for confusing or

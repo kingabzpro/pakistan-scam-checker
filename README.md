@@ -127,11 +127,14 @@ The checkbox is visible and enabled by default on each request, and users can
 turn it off before submitting.
 
 Trace creation is deterministic Python logic and makes no additional model
-request. It records a safe input type or image description, input category,
-urgency, fixed signals, and result counts. The input field uses a safe
-`text: ...` or `image: ...` description generated from fixed templates.
-It never stores raw or redacted messages, screenshots, links, identifiers,
-model explanations, reply text, exceptions, or credentials.
+request. Text inputs are aggressively redacted and capped at 500 characters;
+images use a fixed `image: ...` description without OCR or image storage. The
+trace also records category, urgency, fixed signals, result counts, and a
+deterministic `result_summary` explaining the scam pattern and risk label.
+All trace columns are flat scalar values; no dataset cell contains a nested
+dictionary.
+It never stores raw messages, screenshots, links, detected identifiers, model
+explanations, reply text, exceptions, or credentials.
 
 Safe records are queued without blocking the response, written in batches of
 20 or after 60 seconds, and uploaded as unique JSONL shards. Hub failures leave

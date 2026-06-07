@@ -34,13 +34,23 @@ and convert it into allow-listed categories, booleans, buckets, and counts.
 ## Fields
 
 - Trace identity: random trace ID and UTC timestamp
-- `input`: a fixed-template `text: ...` or `image: ...` description
+- `input`: aggressively redacted, length-limited text for text submissions, or
+  a fixed-template `image: ...` description
 - `input_category`: deterministic category such as courier, bank, or FBR
 - `urgency`: deterministic boolean urgency signal
-- Deterministic signals: OTP, CNIC, credentials, link, payment,
-  refund/prize, courier, challan, and account threat
-- Final risk label and output item counts
-- Explicit privacy flags
+- `result_summary`: deterministic summary of the mapped pattern, whether it is
+  known or unclassified, and why the risk label matters
+- `scam_tactics`: readable comma-separated tactics
+- Flat boolean signal columns such as `signal_link`, `signal_payment`, and
+  `signal_credentials`
+- Flat result columns such as `risk_label`, `red_flag_count`, and
+  `reply_draft_policy`
+- `input_storage`: `redacted_text` or `image_description_only`
+- Flat privacy flags confirming that raw input, images, identifiers, model
+  output, and exception text are not stored
+
+Every dataset cell is a scalar string, number, or boolean. No column contains a
+dictionary or nested object, which keeps the Hugging Face table easy to read.
 
 Records do not contain pipeline steps, cache fields, app commits, failure
 details, request source, schema versions, size buckets, language hints, or
@@ -50,7 +60,7 @@ Modal metadata.
 
 The dataset never stores:
 
-- Raw or redacted message text
+- Raw message text
 - Screenshots, image bytes, or base64
 - URLs, phone numbers, CNICs, names, addresses, account/card numbers, or
   tracking numbers
@@ -58,7 +68,13 @@ The dataset never stores:
   output
 - Exceptions, credentials, tokens, or endpoint headers
 
-Summaries use fixed templates. Regex detection happens transiently in memory.
+Text traces store an aggressively redacted form capped at 500 characters.
+Regexes remove common URLs, emails, phones, CNICs, card/account numbers,
+credentials, addresses, tracking IDs, long numbers, and title-case names or
+entities. Regex redaction cannot guarantee removal of every possible
+identifier, so users should opt out when submitting sensitive content.
+
+Images store only fixed descriptions; screenshots and OCR text are not stored.
 Users see a checked trace disclosure in the app and may opt out before each
 request.
 
@@ -66,13 +82,13 @@ request.
 
 Seed traces represent the six public examples bundled with Pakistan Notice
 Helper. Runtime traces may represent successful, rejected, or failed requests.
-A trace reports whether the existing Modal request occurred, but trace
-generation itself does not invoke the model.
+Trace generation itself does not invoke the model.
 
 ## Limitations
 
 - Regex signals and category detection are approximate.
-- Duration and input sizes are deliberately bucketed.
+- Regex redaction may miss unusual personal or confidential information.
+- Novelty is not researched against external threat-intelligence sources.
 - The dataset cannot reproduce original messages or screenshots.
 - A risk label is safety guidance, not official verification.
 

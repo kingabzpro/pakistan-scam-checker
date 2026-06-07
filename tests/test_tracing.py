@@ -67,6 +67,12 @@ class TraceTests(unittest.TestCase):
         self.assertTrue(image_record["input"].startswith("image: "))
         self.assertEqual(image_record["input_category"], "unknown")
         self.assertFalse(image_record["urgency"])
+        self.assertIn(
+            "does not confirm a new scam type",
+            image_record["result_summary"],
+        )
+        self.assertIn("Strong scam indicators", image_record["result_summary"])
+        self.assertEqual(image_record["input_storage"], "image_description_only")
         for removed in (
             "pipeline_steps",
             "cache",
@@ -88,12 +94,21 @@ class TraceTests(unittest.TestCase):
             example_id="",
             assessment=None,
         )
-        self.assertEqual(
-            text_record["input"],
-            "text: Courier-style content with urgency, payment, courier signals",
-        )
+        self.assertTrue(text_record["input"].startswith("text: "))
+        self.assertIn("courier payment required today", text_record["input"])
+        self.assertNotIn("Urgent", text_record["input"])
         self.assertEqual(text_record["input_category"], "courier")
         self.assertTrue(text_record["urgency"])
+        self.assertIn("Known courier pattern", text_record["result_summary"])
+        self.assertIn(
+            "No completed assessment result was available",
+            text_record["result_summary"],
+        )
+        self.assertEqual(text_record["input_storage"], "redacted_text")
+        self.assertFalse(any(
+            isinstance(value, (dict, list))
+            for value in text_record.values()
+        ))
 
     def test_opt_out_does_not_queue_trace(self) -> None:
         with patch("app.queue_trace") as queue_mock:

@@ -55,6 +55,44 @@ EXAMPLE_PROFILES = {
     "image-mobile": ("image", "marketplace", {"credentials"}),
     "image-traffic": ("image", "traffic_challan", {"link", "urgency", "payment", "challan"}),
 }
+RESULT_GUIDANCE = {
+    "Looks normal": (
+        "No strong scam indicators were found, but verify through an official "
+        "channel."
+    ),
+    "Verify first": (
+        "Limited or ambiguous warning signs were found; verify independently."
+    ),
+    "Suspicious": (
+        "Multiple warning signs were found; use caution and verify independently."
+    ),
+    "Likely scam": (
+        "Strong scam indicators were found; avoid payments, links, and sharing "
+        "credentials."
+    ),
+    "Inappropriate": "The content was not suitable for a scam-risk assessment.",
+    "none": "No completed assessment result was available.",
+}
+CATEGORY_DISPLAY_NAMES = {
+    "fbr": "FBR",
+    "bank": "bank",
+    "wallet": "mobile-wallet",
+    "utility": "utility",
+    "traffic_challan": "traffic-challan",
+    "courier": "courier",
+    "customs": "customs",
+    "university": "education",
+    "job": "job",
+    "marketplace": "marketplace",
+    "unknown": "unclassified",
+}
+SENSITIVE_VALUE_PATTERN = re.compile(
+    r"\b(?:password|passcode|pin|otp|cvv|account(?: number)?|card(?: number)?|"
+    r"tracking(?: id| number)?|consignment(?: id| number)?|reference(?: id| number)?)"
+    r"\s*(?:is|:|#|-)?\s*[A-Za-z0-9@._/-]{2,}",
+    re.I,
+)
+TITLE_CASE_PATTERN = re.compile(r"\b[A-Z][a-z]{2,}\b")
 
 
 def detect_signals(text: str, example_id: str = "") -> dict[str, bool]:
@@ -127,6 +165,51 @@ def safe_description(category: str, signals: dict[str, bool]) -> str:
     return f"{category_labels[category]} content{suffix}"
 
 
+def redact_text(text: str) -> str:
+    value = re.sub(r"\s+", " ", text or "").strip()
+    value = SENSITIVE_VALUE_PATTERN.sub(
+        lambda match: match.group(0).split()[0] + " [REDACTED]",
+        value,
+    )
+    replacements = (
+        (r"https?://\S+|www\.\S+", "[LINK]"),
+        (r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b", "[EMAIL]"),
+        (r"\b\d{5}-\d{7}-\d\b", "[CNIC]"),
+        (r"(?<!\d)(?:\+?92[- ]?|0)?3\d{2}[- ]?\d{7}(?!\d)", "[PHONE]"),
+        (r"\bPK\d{2}[A-Z0-9]{10,30}\b", "[ACCOUNT]"),
+        (r"(?<!\d)(?:\d[ -]?){12,19}(?!\d)", "[CARD_NUMBER]"),
+        (r"\b\d{3,}\b", "[NUMBER]"),
+        (
+            r"\b(?:address|location|house|street|road|flat)\b"
+            r"[^,.;]{0,60}",
+            "[ADDRESS]",
+        ),
+    )
+    for pattern, replacement in replacements:
+        value = re.sub(pattern, replacement, value, flags=re.I)
+    value = TITLE_CASE_PATTERN.sub("[NAME_OR_ENTITY]", value)
+    value = re.sub(
+        r"(?:\[[A-Z_]+\]\s*){2,}",
+        lambda match: match.group(0).strip() + " ",
+        value,
+    )
+    return value[:500] or "[EMPTY]"
+
+
+def result_summary(
+    risk_label: str,
+    category: str,
+    signals: dict[str, bool],
+) -> str:
+    pattern = safe_description(category, signals)
+    novelty = (
+        "Unclassified pattern; this does not confirm a new scam type."
+        if category == "unknown"
+        else f"Known {CATEGORY_DISPLAY_NAMES[category]} pattern."
+    )
+    return f"{risk_label}: {pattern}. {novelty} {RESULT_GUIDANCE[risk_label]}"
+
+
 def build_input_profile(text: str, image_data_url: str, example_id: str = "") -> dict[str, Any]:
     profile = EXAMPLE_PROFILES.get(example_id)
     if profile:
@@ -137,12 +220,18 @@ def build_input_profile(text: str, image_data_url: str, example_id: str = "") ->
         input_type = "text"
     signals = detect_signals(text, example_id)
     category = detect_category(text, signals, example_id)
+    tactics = [name for name, enabled in signals.items() if enabled]
     return {
-        "input": f"{input_type}: {safe_description(category, signals)}",
+        "input": (
+            f"text: {redact_text(text)}"
+            if input_type == "text"
+            else f"image: {safe_description(category, signals)}"
+        ),
         "input_category": category,
         "urgency": signals["urgency"],
-        "signals": {
-            name: enabled
+        "scam_tactics": ", ".join(tactics) if tactics else "none",
+        **{
+            f"signal_{name}": enabled
             for name, enabled in signals.items()
             if name != "urgency"
         },
@@ -161,33 +250,38 @@ def build_trace_record(
     if risk_label not in RISK_LABELS:
         risk_label = "none"
     input_profile = build_input_profile(text, image_data_url, example_id)
+    signals = detect_signals(text, example_id)
+    category = input_profile["input_category"]
+    assessment = assessment or {}
     return {
         "trace_id": trace_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         **input_profile,
-        "result": {
-            "risk_label": risk_label,
-            "red_flag_count": min(len((assessment or {}).get("red_flags", [])), 50),
-            "safe_next_step_count": min(
-                len((assessment or {}).get("safe_next_steps", [])),
-                50,
-            ),
-            "reply_draft_returned": bool((assessment or {}).get("reply_draft")),
-            "reply_draft_policy": (
-                "allowed"
-                if risk_label in {"Verify first", "Suspicious"}
-                else "suppressed"
-                if risk_label != "none"
-                else "not_applicable"
-            ),
-        },
-        "privacy": {
-            "raw_input_stored": False,
-            "raw_image_stored": False,
-            "raw_model_output_stored": False,
-            "exception_text_stored": False,
-            "identifiers_stored": False,
-        },
+        "result_summary": result_summary(risk_label, category, signals),
+        "risk_label": risk_label,
+        "red_flag_count": min(len(assessment.get("red_flags", [])), 50),
+        "safe_next_step_count": min(
+            len(assessment.get("safe_next_steps", [])),
+            50,
+        ),
+        "reply_draft_returned": bool(assessment.get("reply_draft")),
+        "reply_draft_policy": (
+            "allowed"
+            if risk_label in {"Verify first", "Suspicious"}
+            else "suppressed"
+            if risk_label != "none"
+            else "not_applicable"
+        ),
+        "input_storage": (
+            "redacted_text"
+            if input_profile["input"].startswith("text: ")
+            else "image_description_only"
+        ),
+        "raw_input_stored": False,
+        "raw_image_stored": False,
+        "raw_model_output_stored": False,
+        "exception_text_stored": False,
+        "identifiers_stored": False,
     }
 
 
@@ -201,9 +295,28 @@ def validate_trace(record: Any) -> list[str]:
         "input",
         "input_category",
         "urgency",
-        "signals",
-        "result",
-        "privacy",
+        "scam_tactics",
+        "signal_otp",
+        "signal_cnic",
+        "signal_credentials",
+        "signal_link",
+        "signal_payment",
+        "signal_refund_or_prize",
+        "signal_courier",
+        "signal_challan",
+        "signal_account_threat",
+        "result_summary",
+        "risk_label",
+        "red_flag_count",
+        "safe_next_step_count",
+        "reply_draft_returned",
+        "reply_draft_policy",
+        "input_storage",
+        "raw_input_stored",
+        "raw_image_stored",
+        "raw_model_output_stored",
+        "exception_text_stored",
+        "identifiers_stored",
     }
     missing = required - record.keys()
     if missing:
@@ -221,11 +334,28 @@ def validate_trace(record: Any) -> list[str]:
         errors.append("Input category must be a string.")
     if not isinstance(record.get("urgency"), bool):
         errors.append("Urgency must be boolean.")
-    if record.get("result", {}).get("risk_label") not in RISK_LABELS:
+    if not isinstance(record.get("result_summary"), str):
+        errors.append("Result summary must be a string.")
+    if record.get("risk_label") not in RISK_LABELS:
         errors.append("Invalid risk label.")
-    privacy = record.get("privacy", {})
-    if not isinstance(privacy, dict) or any(privacy.get(key) is not False for key in privacy):
-        errors.append("Privacy flags must all be false.")
+    private_storage_flags = (
+        "raw_input_stored",
+        "raw_image_stored",
+        "raw_model_output_stored",
+        "exception_text_stored",
+        "identifiers_stored",
+    )
+    if any(
+        record.get(key) is not False for key in private_storage_flags
+    ):
+        errors.append("Raw/private storage flags must all be false.")
+    if record.get("input_storage") not in {
+        "redacted_text",
+        "image_description_only",
+    }:
+        errors.append("Invalid input storage category.")
+    if any(isinstance(value, (dict, list)) for value in record.values()):
+        errors.append("Trace columns must contain scalar values only.")
     forbidden_keys = {
         "schema_version",
         "app_commit",

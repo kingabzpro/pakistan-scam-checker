@@ -254,10 +254,6 @@ def build_trace_record(
         **input_profile,
         "result_summary": result_summary(risk_label, category, signals),
         "risk_label": risk_label,
-        "safe_next_step_count": min(
-            len(assessment.get("safe_next_steps", [])),
-            50,
-        ),
         "reply_draft_policy": (
             "allowed"
             if risk_label in {"Verify first", "Suspicious"}
@@ -281,7 +277,6 @@ def validate_trace(record: Any) -> list[str]:
         "scam_tactics",
         "result_summary",
         "risk_label",
-        "safe_next_step_count",
         "reply_draft_policy",
     }
     missing = required - record.keys()
@@ -328,6 +323,7 @@ def validate_trace(record: Any) -> list[str]:
         "raw_model_output_stored",
         "red_flag_count",
         "reply_draft_returned",
+        "safe_next_step_count",
         "signal_account_threat",
         "signal_challan",
         "signal_cnic",

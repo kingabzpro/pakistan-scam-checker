@@ -92,6 +92,7 @@ class TraceTests(unittest.TestCase):
             "raw_model_output_stored",
             "red_flag_count",
             "reply_draft_returned",
+            "safe_next_step_count",
             "signal_account_threat",
             "signal_challan",
             "signal_cnic",

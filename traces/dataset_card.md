@@ -41,8 +41,7 @@ and convert it into allow-listed categories, booleans, buckets, and counts.
 - `result_summary`: deterministic summary of the mapped pattern, whether it is
   known or unclassified, and why the risk label matters
 - `scam_tactics`: readable comma-separated tactics
-- Flat result columns such as `risk_label`, `safe_next_step_count`, and
-  `reply_draft_policy`
+- Flat result columns such as `risk_label` and `reply_draft_policy`
 
 Every dataset cell is a scalar string, number, or boolean. No column contains a
 dictionary or nested object, which keeps the Hugging Face table easy to read.

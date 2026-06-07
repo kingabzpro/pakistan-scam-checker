@@ -20,21 +20,10 @@ DATASET_REPO = os.getenv(
     "HF_TRACE_DATASET_REPO",
     "build-small-hackathon/pakistan-notice-helper-traces",
 )
-SCHEMA_VERSION = "1.0"
 BATCH_SIZE = max(1, int(os.getenv("TRACE_BATCH_SIZE", "20")))
 FLUSH_SECONDS = max(1.0, float(os.getenv("TRACE_FLUSH_SECONDS", "60")))
 MAX_QUEUE_SIZE = max(1, int(os.getenv("TRACE_MAX_QUEUE_SIZE", "5000")))
 
-PIPELINE_STEPS = (
-    "receive",
-    "validate",
-    "cache_lookup",
-    "modal_request",
-    "parse_json",
-    "normalize_result",
-    "reply_filter",
-    "response",
-)
 RISK_LABELS = {
     "Looks normal",
     "Verify first",
@@ -43,19 +32,6 @@ RISK_LABELS = {
     "Inappropriate",
     "none",
 }
-FAILURE_CATEGORIES = {
-    "none",
-    "validation_empty",
-    "credentials_missing",
-    "http_auth",
-    "http_error",
-    "connection_error",
-    "timeout",
-    "invalid_model_output",
-    "internal_error",
-}
-PIPELINE_STATUSES = {"completed", "skipped", "rejected", "failed", "hit", "miss"}
-REQUEST_SOURCES = {"user", "cached_modal_example"}
 SIGNAL_PATTERNS = {
     "otp": r"\b(?:otp|one[- ]time (?:pin|password)|verification code)\b",
     "cnic": r"\bcnic\b",
@@ -195,7 +171,7 @@ def detect_language_hint(text: str) -> str:
     return "unknown"
 
 
-def safe_summary(category: str, signals: dict[str, bool], input_type: str) -> str:
+def safe_description(category: str, signals: dict[str, bool]) -> str:
     category_labels = {
         "fbr": "FBR-style",
         "bank": "Bank-style",
@@ -223,15 +199,13 @@ def safe_summary(category: str, signals: dict[str, bool], input_type: str) -> st
     }
     active = [signal_labels[name] for name, enabled in signals.items() if enabled][:4]
     suffix = f" with {', '.join(active)} signals" if active else " with no mapped signals"
-    return f"{category_labels[category]} {input_type} input{suffix}"
+    return f"{category_labels[category]} content{suffix}"
 
 
 def build_input_profile(text: str, image_data_url: str, example_id: str = "") -> dict[str, Any]:
     profile = EXAMPLE_PROFILES.get(example_id)
     if profile:
         input_type = profile[0]
-    elif image_data_url and text:
-        input_type = "text_and_image"
     elif image_data_url:
         input_type = "image"
     else:
@@ -239,14 +213,22 @@ def build_input_profile(text: str, image_data_url: str, example_id: str = "") ->
     signals = detect_signals(text, example_id)
     category = detect_category(text, signals, example_id)
     return {
-        "type": input_type,
+        "input": (
+            f"image ({safe_description(category, signals)})"
+            if input_type == "image"
+            else "text"
+        ),
+        "input_category": category,
+        "urgency": signals["urgency"],
         "text_character_bucket": input_size_bucket(len(text or "")),
         "text_byte_bucket": input_size_bucket(len((text or "").encode("utf-8"))),
         "image_size_bucket": image_size_bucket(len(image_data_url or "")),
-        "category": category,
         "language_hint": detect_language_hint(text),
-        "signals": signals,
-        "safe_summary": safe_summary(category, signals, input_type),
+        "signals": {
+            name: enabled
+            for name, enabled in signals.items()
+            if name != "urgency"
+        },
     }
 
 
@@ -255,53 +237,20 @@ def build_trace_record(
     text: str,
     image_data_url: str,
     example_id: str,
-    request_source: str,
-    pipeline_status: dict[str, str],
-    pipeline_ms: dict[str, float],
     modal_called: bool,
     modal_ms: float,
     retry_count: int,
     assessment: dict[str, Any] | None,
-    failure_category: str = "none",
-    failure_stage: str = "none",
 ) -> dict[str, Any]:
     trace_id = str(uuid.uuid4())
     risk_label = str((assessment or {}).get("risk_label", "none"))
     if risk_label not in RISK_LABELS:
         risk_label = "none"
-    commit = (
-        os.getenv("SPACE_COMMIT")
-        or os.getenv("GIT_COMMIT")
-        or os.getenv("COMMIT_SHA")
-        or ""
-    )
-    commit = commit[:64] if re.fullmatch(r"[0-9a-fA-F]{7,64}", commit) else "unknown"
-    request_source = (
-        request_source if request_source in REQUEST_SOURCES else "user"
-    )
+    input_profile = build_input_profile(text, image_data_url, example_id)
     return {
-        "schema_version": SCHEMA_VERSION,
         "trace_id": trace_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "app_commit": commit,
-        "request_source": request_source,
-        "input": build_input_profile(text, image_data_url, example_id),
-        "pipeline_steps": [
-            {
-                "step": step,
-                "status": (
-                    pipeline_status.get(step, "skipped")
-                    if pipeline_status.get(step, "skipped") in PIPELINE_STATUSES
-                    else "skipped"
-                ),
-                "duration_bucket": duration_bucket(pipeline_ms.get(step, 0.0)),
-            }
-            for step in PIPELINE_STEPS
-        ],
-        "cache": {
-            "hit": request_source == "cached_modal_example",
-            "example_id": example_id if example_id in EXAMPLE_PROFILES else "none",
-        },
+        **input_profile,
         "modal": {
             "called": bool(modal_called),
             "model_family": (
@@ -314,7 +263,7 @@ def build_trace_record(
             "retry_count": max(0, min(int(retry_count), 20)),
             "outcome": (
                 "success"
-                if modal_called and failure_category == "none"
+                if modal_called and assessment
                 else "failed"
                 if modal_called
                 else "not_called"
@@ -336,14 +285,6 @@ def build_trace_record(
                 else "not_applicable"
             ),
         },
-        "failure": {
-            "category": (
-                failure_category
-                if failure_category in FAILURE_CATEGORIES
-                else "internal_error"
-            ),
-            "stage": failure_stage if failure_stage in {*PIPELINE_STEPS, "none"} else "response",
-        },
         "privacy": {
             "raw_input_stored": False,
             "raw_image_stored": False,
@@ -359,35 +300,46 @@ def validate_trace(record: Any) -> list[str]:
     if not isinstance(record, dict):
         return ["Trace must be an object."]
     required = {
-        "schema_version",
         "trace_id",
         "timestamp",
-        "app_commit",
-        "request_source",
         "input",
-        "pipeline_steps",
-        "cache",
+        "input_category",
+        "urgency",
+        "text_character_bucket",
+        "text_byte_bucket",
+        "image_size_bucket",
+        "language_hint",
+        "signals",
         "modal",
         "result",
-        "failure",
         "privacy",
     }
     missing = required - record.keys()
     if missing:
         errors.append("Missing fields: " + ", ".join(sorted(missing)))
-    if record.get("schema_version") != SCHEMA_VERSION:
-        errors.append("Unsupported schema_version.")
+    input_value = record.get("input")
+    if input_value != "text" and not (
+        isinstance(input_value, str)
+        and input_value.startswith("image (")
+        and input_value.endswith(")")
+    ):
+        errors.append("Input must be text or a fixed image description.")
+    if not isinstance(record.get("input_category"), str):
+        errors.append("Input category must be a string.")
+    if not isinstance(record.get("urgency"), bool):
+        errors.append("Urgency must be boolean.")
     if record.get("result", {}).get("risk_label") not in RISK_LABELS:
         errors.append("Invalid risk label.")
     privacy = record.get("privacy", {})
     if not isinstance(privacy, dict) or any(privacy.get(key) is not False for key in privacy):
         errors.append("Privacy flags must all be false.")
-    steps = record.get("pipeline_steps", [])
-    if not isinstance(steps, list) or [item.get("step") for item in steps] != list(
-        PIPELINE_STEPS
-    ):
-        errors.append("Pipeline steps are invalid or out of order.")
     forbidden_keys = {
+        "schema_version",
+        "app_commit",
+        "request_source",
+        "pipeline_steps",
+        "cache",
+        "failure",
         "raw_input",
         "raw_text",
         "image_data_url",

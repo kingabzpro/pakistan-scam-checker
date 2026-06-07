@@ -119,7 +119,7 @@ unsloth/Qwen3.6-27B-MTP-GGUF
 All frontend assets are local. The app has no runtime CDN, analytics, OCR, MCP,
 or OpenAI Agents SDK. Analysis currently depends on the deployed Modal model.
 
-## Sharing is Caring: Open Pipeline Traces
+## Sharing is Caring: Open Traces
 
 The app publishes optional privacy-safe backend traces to
 [`build-small-hackathon/pakistan-notice-helper-traces`](https://huggingface.co/datasets/build-small-hackathon/pakistan-notice-helper-traces).
@@ -127,8 +127,8 @@ The checkbox is visible and enabled by default on each request, and users can
 turn it off before submitting.
 
 Trace creation is deterministic Python logic and makes no additional model
-request. It records the actual pipeline stages, cache/Modal status, duration
-buckets, fixed signal categories, result counts, and sanitized failure types.
+request. It records a safe input type or image description, input category,
+urgency, size and latency buckets, fixed signals, and result counts.
 It never stores raw or redacted messages, screenshots, links, identifiers,
 model explanations, reply text, exceptions, or credentials.
 
@@ -143,6 +143,7 @@ python -m traces.scripts.seed_trace_dataset
 python -m traces.scripts.validate_traces
 python -m traces.scripts.create_trace_dataset --dry-run
 python -m traces.scripts.create_trace_dataset
+python -m traces.scripts.create_trace_dataset --replace-data
 python -m traces.scripts.export_pending_traces --dry-run
 python -m traces.scripts.upload_trace_shards --dry-run
 ```

@@ -27,9 +27,6 @@ class TraceTests(unittest.TestCase):
             ),
             image_data_url="data:image/png;base64,PRIVATE_IMAGE_BYTES",
             example_id="",
-            request_source="user",
-            pipeline_status={step: "completed" for step in trace_runtime.PIPELINE_STEPS},
-            pipeline_ms={},
             modal_called=True,
             modal_ms=120,
             retry_count=0,
@@ -68,6 +65,34 @@ class TraceTests(unittest.TestCase):
         self.assertLess(elapsed_ms, 10)
         self.assertFalse(trace_runtime.validate_trace(records[0]))
 
+    def test_trace_uses_simplified_columns(self) -> None:
+        image_record = self.sample_record()
+        self.assertTrue(image_record["input"].startswith("image ("))
+        self.assertEqual(image_record["input_category"], "unknown")
+        self.assertFalse(image_record["urgency"])
+        for removed in (
+            "pipeline_steps",
+            "cache",
+            "app_commit",
+            "failure",
+            "schema_version",
+            "request_source",
+        ):
+            self.assertNotIn(removed, image_record)
+
+        text_record = trace_runtime.build_trace_record(
+            text="Urgent courier payment required today",
+            image_data_url="",
+            example_id="",
+            modal_called=False,
+            modal_ms=0,
+            retry_count=0,
+            assessment=None,
+        )
+        self.assertEqual(text_record["input"], "text")
+        self.assertEqual(text_record["input_category"], "courier")
+        self.assertTrue(text_record["urgency"])
+
     def test_opt_out_does_not_queue_trace(self) -> None:
         with patch("app.queue_trace") as queue_mock:
             result = app.analyze_notice("", "", save_trace=False)
@@ -83,17 +108,15 @@ class TraceTests(unittest.TestCase):
         model_mock.assert_not_called()
         self.assertEqual(result["source"], "cached_modal_example")
 
-    def test_empty_input_traces_sanitized_validation_failure(self) -> None:
+    def test_empty_input_trace_has_no_failure_metadata(self) -> None:
         with patch(
             "app.queue_trace",
             return_value=("trace-id", "queued"),
         ) as queue_mock:
             result = app.analyze_notice("")
         self.assertFalse(result["ok"])
-        self.assertEqual(
-            queue_mock.call_args.kwargs["failure_category"],
-            "validation_empty",
-        )
+        self.assertNotIn("failure_category", queue_mock.call_args.kwargs)
+        self.assertNotIn("failure_stage", queue_mock.call_args.kwargs)
 
     def test_missing_credentials_traces_without_model_call(self) -> None:
         with patch(
@@ -106,10 +129,7 @@ class TraceTests(unittest.TestCase):
             result = app.analyze_notice("test message")
         self.assertFalse(result["ok"])
         model_mock.assert_not_called()
-        self.assertEqual(
-            queue_mock.call_args.kwargs["failure_category"],
-            "credentials_missing",
-        )
+        self.assertFalse(queue_mock.call_args.kwargs["modal_called"])
 
     def test_success_uses_existing_model_call_once(self) -> None:
         assessment = {
@@ -156,7 +176,7 @@ class TraceTests(unittest.TestCase):
         ) as queue_mock:
             result = app.analyze_notice("test message")
         self.assertFalse(result["ok"])
-        self.assertEqual(queue_mock.call_args.kwargs["failure_category"], "timeout")
+        self.assertNotIn("failure_category", queue_mock.call_args.kwargs)
 
     def test_http_failure_is_sanitized(self) -> None:
         request = httpx.Request("POST", "https://example.invalid")
@@ -174,7 +194,6 @@ class TraceTests(unittest.TestCase):
         ) as queue_mock:
             result = app.analyze_notice("test message")
         self.assertFalse(result["ok"])
-        self.assertEqual(queue_mock.call_args.kwargs["failure_category"], "http_error")
         self.assertNotIn("private", json.dumps(queue_mock.call_args.kwargs))
 
     def test_malformed_output_is_sanitized(self) -> None:
@@ -187,10 +206,6 @@ class TraceTests(unittest.TestCase):
         ) as queue_mock:
             result = app.analyze_notice("test message")
         self.assertFalse(result["ok"])
-        self.assertEqual(
-            queue_mock.call_args.kwargs["failure_category"],
-            "invalid_model_output",
-        )
         self.assertNotIn("PRIVATE RAW OUTPUT", json.dumps(queue_mock.call_args.kwargs))
 
     def test_normalization_failure_uses_normalize_stage(self) -> None:

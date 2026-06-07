@@ -323,19 +323,6 @@ def analyze_notice(
     save_trace: bool = True,
 ) -> dict[str, Any]:
     """Analyze supplied text/image using the configured model only."""
-    request_started = time.perf_counter()
-    pipeline_status = {step: "skipped" for step in (
-        "receive",
-        "validate",
-        "cache_lookup",
-        "modal_request",
-        "parse_json",
-        "normalize_result",
-        "reply_filter",
-        "response",
-    )}
-    pipeline_ms: dict[str, float] = {}
-    pipeline_status["receive"] = "completed"
     text = (text or "").strip()
     image_data_url = image_data_url or ""
     example_id = (example_id or "").strip()
@@ -343,57 +330,35 @@ def analyze_notice(
     def finish(
         response: dict[str, Any],
         *,
-        request_source: str,
         telemetry: dict[str, Any] | None = None,
-        failure_category: str = "none",
-        failure_stage: str = "none",
     ) -> dict[str, Any]:
         telemetry = telemetry or {}
-        pipeline_status["response"] = "completed"
-        pipeline_ms["response"] = (time.perf_counter() - request_started) * 1000
         if save_trace:
             trace_id, queued = queue_trace(
                 text=text,
                 image_data_url=image_data_url,
                 example_id=example_id,
-                request_source=request_source,
-                pipeline_status=pipeline_status,
-                pipeline_ms=pipeline_ms,
                 modal_called=bool(telemetry.get("modal_called", False)),
                 modal_ms=float(telemetry.get("modal_ms", 0.0)),
                 retry_count=int(telemetry.get("retry_count", 0)),
                 assessment=response.get("assessment"),
-                failure_category=failure_category,
-                failure_stage=failure_stage,
             )
             response["trace"] = {"trace_id": trace_id, "status": queued}
         else:
             response["trace"] = {"trace_id": "", "status": "disabled"}
         return response
 
-    validation_started = time.perf_counter()
     valid_example = example_id in EXAMPLE_ASSESSMENTS
     if not text and not image_data_url and not valid_example:
-        pipeline_status["validate"] = "rejected"
-        pipeline_ms["validate"] = (time.perf_counter() - validation_started) * 1000
         return finish(
             {
                 "ok": False,
                 "error": "Paste a message or upload a screenshot to continue.",
                 "status": model_status(),
             },
-            request_source="user",
-            failure_category="validation_empty",
-            failure_stage="validate",
         )
-    pipeline_status["validate"] = "completed"
-    pipeline_ms["validate"] = (time.perf_counter() - validation_started) * 1000
 
-    cache_started = time.perf_counter()
     if example_id in EXAMPLE_ASSESSMENTS:
-        pipeline_status["cache_lookup"] = "hit"
-        pipeline_ms["cache_lookup"] = (time.perf_counter() - cache_started) * 1000
-        pipeline_status["reply_filter"] = "completed"
         return finish(
             {
                 "ok": True,
@@ -401,14 +366,10 @@ def analyze_notice(
                 "status": model_status(),
                 "source": "cached_modal_example",
             },
-            request_source="cached_modal_example",
         )
-    pipeline_status["cache_lookup"] = "miss"
-    pipeline_ms["cache_lookup"] = (time.perf_counter() - cache_started) * 1000
 
     status = model_status()
     if not status["connected"]:
-        pipeline_status["modal_request"] = "skipped"
         return finish(
             {
                 "ok": False,
@@ -419,20 +380,10 @@ def analyze_notice(
                 ),
                 "status": status,
             },
-            request_source="user",
-            failure_category="credentials_missing",
-            failure_stage="modal_request",
         )
     telemetry: dict[str, Any] = {}
     try:
         result = call_model(text, image_data_url, telemetry)
-        pipeline_status["modal_request"] = "completed"
-        pipeline_status["parse_json"] = "completed"
-        pipeline_status["normalize_result"] = "completed"
-        pipeline_status["reply_filter"] = "completed"
-        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
-        pipeline_ms["parse_json"] = float(telemetry.get("parse_ms", 0.0))
-        pipeline_ms["normalize_result"] = float(telemetry.get("normalize_ms", 0.0))
         return finish(
             {
                 "ok": True,
@@ -440,60 +391,27 @@ def analyze_notice(
                 "status": status,
                 "source": "model",
             },
-            request_source="user",
             telemetry=telemetry,
         )
     except APIStatusError as exc:
-        pipeline_status["modal_request"] = "failed"
-        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
         message = (
             "The Modal model rejected the request. Check the proxy credentials."
             if exc.status_code in {401, 403}
             else f"The Modal model returned HTTP {exc.status_code}. Try again shortly."
         )
-        failure_category = "http_auth" if exc.status_code in {401, 403} else "http_error"
     except APITimeoutError:
-        pipeline_status["modal_request"] = "failed"
-        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
         message = "The Modal model is unavailable or still starting. Try again shortly."
-        failure_category = "timeout"
     except APIConnectionError:
-        pipeline_status["modal_request"] = "failed"
-        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
         message = "The Modal model is unavailable or still starting. Try again shortly."
-        failure_category = "connection_error"
     except (ValueError, RuntimeError):
-        pipeline_status["modal_request"] = (
-            "completed" if telemetry.get("modal_called") else "skipped"
-        )
-        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
-        pipeline_ms["parse_json"] = float(telemetry.get("parse_ms", 0.0))
-        pipeline_ms["normalize_result"] = float(
-            telemetry.get("normalize_ms", 0.0)
-        )
-        if telemetry.get("parse_completed"):
-            pipeline_status["parse_json"] = "completed"
-            pipeline_status["normalize_result"] = "failed"
-            failure_stage = "normalize_result"
-        else:
-            pipeline_status["parse_json"] = "failed"
-            failure_stage = "parse_json"
         message = "The model returned an invalid response. Please try again."
-        failure_category = "invalid_model_output"
     return finish(
         {
             "ok": False,
             "error": message,
             "status": {**status, "connected": False, "label": "Modal model unavailable"},
         },
-        request_source="user",
         telemetry=telemetry,
-        failure_category=failure_category,
-        failure_stage=(
-            failure_stage
-            if failure_category == "invalid_model_output"
-            else "modal_request"
-        ),
     )
 
 

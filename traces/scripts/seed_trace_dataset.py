@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 TRACE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from traces.runtime import PIPELINE_STEPS, build_trace_record, validate_trace
+from traces.runtime import build_trace_record, validate_trace
 
 TEXT_EXAMPLES = {
     "text-courier": (
@@ -38,22 +38,6 @@ def build_seed_records() -> list[dict]:
     assessments = json.loads(
         (ROOT / "data" / "example_assessments.json").read_text(encoding="utf-8")
     )["examples"]
-    pipeline_status = {
-        step: (
-            "completed"
-            if step
-            in {
-                "receive",
-                "validate",
-                "reply_filter",
-                "response",
-            }
-            else "hit"
-            if step == "cache_lookup"
-            else "skipped"
-        )
-        for step in PIPELINE_STEPS
-    }
     records = []
     for example_id, assessment in assessments.items():
         text = TEXT_EXAMPLES.get(example_id, "")
@@ -65,9 +49,6 @@ def build_seed_records() -> list[dict]:
             text=text,
             image_data_url=image_placeholder,
             example_id=example_id,
-            request_source="cached_modal_example",
-            pipeline_status=pipeline_status,
-            pipeline_ms={},
             modal_called=False,
             modal_ms=0,
             retry_count=0,

@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 
 from huggingface_hub import HfApi
+from huggingface_hub.errors import EntryNotFoundError
 
 ROOT = Path(__file__).resolve().parents[2]
 TRACE_DIR = Path(__file__).resolve().parents[1]
@@ -20,6 +21,11 @@ def main() -> int:
         default=os.getenv("HF_TRACE_DATASET_REPO", DEFAULT_REPO),
     )
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--replace-data",
+        action="store_true",
+        help="Delete existing data files before uploading the current seed.",
+    )
     args = parser.parse_args()
     files = {
         TRACE_DIR / "dataset_card.md": "README.md",
@@ -27,6 +33,8 @@ def main() -> int:
     }
     if args.dry_run:
         print(f"Would create public dataset: {args.repo_id}")
+        if args.replace_data:
+            print("Would delete the existing data/ folder.")
         for local, remote in files.items():
             print(f"Would upload {local} -> {remote}")
         return 0
@@ -37,6 +45,16 @@ def main() -> int:
         private=False,
         exist_ok=True,
     )
+    if args.replace_data:
+        try:
+            api.delete_folder(
+                path_in_repo="data",
+                repo_id=args.repo_id,
+                repo_type="dataset",
+                commit_message="Replace trace data for simplified schema",
+            )
+        except EntryNotFoundError:
+            pass
     for local, remote in files.items():
         api.upload_file(
             path_or_fileobj=str(local),

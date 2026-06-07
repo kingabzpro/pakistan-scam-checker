@@ -27,7 +27,7 @@ tags:
 
 # Pakistan Notice Helper
 
-Pakistan Notice Helper is a model-powered safety assistant for confusing or
+Pakistan Notice Helper is a Qwen3.6-powered safety assistant for confusing or
 suspicious Pakistani notices, bills, SMS messages, bank alerts, FBR-style
 messages, challans, and courier/customs messages. It accepts pasted text and
 screenshots, then returns:

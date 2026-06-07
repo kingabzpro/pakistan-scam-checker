@@ -153,11 +153,17 @@ textarea:disabled { opacity: .45; background: #f0f5f2; cursor: not-allowed; }
 .example-icon { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: var(--green-100); color: var(--green-800); font-size: 11px; font-weight: 900; }
 .example-card strong, .example-card small { display: block; }
 .example-card small { margin-top: 3px; color: var(--muted); }
-.example-grid-images { margin-top: 14px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
-.example-image-card { flex-direction: column; align-items: stretch; padding: 10px; gap: 8px; }
+.example-grid-images {
+  margin-top: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+}
+.example-image-card {
+  align-self: start; flex-direction: column; align-items: stretch; padding: 10px; gap: 10px;
+}
 .example-thumb {
-  width: 100%; height: 120px; object-fit: cover; border-radius: 10px;
-  border: 1px solid var(--line); background: #f5f5f5;
+  display: block; width: 100%; height: auto; max-height: 360px; object-fit: contain;
+  border: 1px solid var(--line); border-radius: 10px; background: #f5f5f5;
 }
 .example-image-card strong { font-size: 13px; }
 .example-image-card small { font-size: 11px; }
@@ -200,6 +206,7 @@ footer { padding: 24px clamp(18px, 5vw, 72px); display: flex; justify-content: s
   .explanation-card { grid-column: auto; }
   .section-heading, .result-header { align-items: flex-start; flex-direction: column; }
   .field-meta { flex-direction: column; }
+  .example-grid-images { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
 }
 
 @media (max-width: 520px) {
@@ -215,6 +222,8 @@ footer { padding: 24px clamp(18px, 5vw, 72px); display: flex; justify-content: s
   .result-card { padding: 19px; }
   .card-title { grid-template-columns: 30px 1fr; }
   .copy-button { grid-column: 2; justify-self: start; }
+  .example-grid-images { grid-template-columns: 1fr; }
+  .example-thumb { width: auto; max-width: 100%; max-height: 440px; margin-inline: auto; }
   footer { flex-direction: column; }
 }
 

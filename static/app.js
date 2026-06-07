@@ -114,7 +114,8 @@ function renderResult(payload) {
 
   const replyCard = document.querySelector("#replyCard");
   const replyText = document.querySelector("#replyText");
-  if (result.reply_draft && result.reply_draft.trim()) {
+  const replyAllowed = ["Verify first", "Suspicious"].includes(result.risk_label);
+  if (replyAllowed && result.reply_draft && result.reply_draft.trim()) {
     replyText.textContent = result.reply_draft;
     replyCard.hidden = false;
   } else {

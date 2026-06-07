@@ -7,7 +7,7 @@ OpenAI Python SDK is used only as a client for that OpenAI-compatible server.
 
 ```powershell
 $env:MODEL_BASE_URL = "http://127.0.0.1:8080"
-$env:MODEL_NAME = "qwen3.6-27b-mtp"
+$env:MODEL_NAME = "qwen3.5-4b-q8"
 $env:MODEL_API_KEY = ""
 python app.py
 ```
@@ -21,7 +21,7 @@ Start a recent `llama-server` build with the model and multimodal projector:
 
 ```bash
 llama-server \
-  --model Qwen3.6-27B-UD-Q4_K_XL.gguf \
+  --model Qwen3.5-4B-Q8_0.gguf \
   --mmproj mmproj-F16.gguf \
   --host 127.0.0.1 --port 8080 \
   --ctx-size 8192 --n-gpu-layers all \

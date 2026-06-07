@@ -249,6 +249,57 @@ class TraceTests(unittest.TestCase):
         self.assertTrue(telemetry["parse_completed"])
         self.assertNotIn("normalize_completed", telemetry)
 
+    def test_model_json_ignores_thinking_block(self) -> None:
+        assessment = app.parse_model_json(
+            "<think>Consider the visible evidence first.</think>\n"
+            + json.dumps(
+                {
+                    "risk_label": "Suspicious",
+                    "simple_explanation": "The sender requests an unsafe action.",
+                    "red_flags": ["Untrusted payment request"],
+                    "safe_next_steps": ["Verify through an official channel."],
+                    "reply_draft": "Please confirm through your official channel.",
+                }
+            )
+        )
+        self.assertEqual(assessment["risk_label"], "Suspicious")
+
+    def test_reasoning_is_enabled_in_model_request(self) -> None:
+        captured: dict = {}
+
+        class Completions:
+            def create(self, **kwargs):
+                captured.update(kwargs)
+                message = type("Message", (), {"content": json.dumps({
+                    "risk_label": "Verify first",
+                    "simple_explanation": "Verify independently.",
+                    "red_flags": ["Unverified sender"],
+                    "safe_next_steps": ["Use an official channel."],
+                    "reply_draft": "Please confirm through an official channel.",
+                })})()
+                choice = type("Choice", (), {"message": message})()
+                return type("Completion", (), {"choices": [choice]})()
+
+        client = type(
+            "Client",
+            (),
+            {"chat": type("Chat", (), {"completions": Completions()})()},
+        )()
+        with patch("app.create_model_client", return_value=(client, "model")), patch.dict(
+            "os.environ",
+            {"MODEL_ENABLE_REASONING": "true"},
+        ):
+            app.call_model("test", "")
+
+        self.assertTrue(
+            captured["extra_body"]["chat_template_kwargs"]["enable_thinking"]
+        )
+        self.assertEqual(captured["extra_body"]["top_k"], 20)
+        self.assertEqual(captured["temperature"], 1.0)
+        self.assertEqual(captured["top_p"], 0.95)
+        self.assertEqual(captured["presence_penalty"], 1.5)
+        self.assertEqual(captured["max_tokens"], 2048)
+
     def test_model_retry_is_counted_without_extra_trace_call(self) -> None:
         request = httpx.Request("POST", "https://example.invalid")
         unavailable = APIStatusError(

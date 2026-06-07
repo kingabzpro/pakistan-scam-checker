@@ -17,30 +17,21 @@ problem with a model small enough to run through `llama.cpp`.
 
 ## Why I built it this way
 
-I wanted to build with a model I already understood instead of spending most
-of the hackathon comparing unfamiliar models. I use Qwen3.6 27B locally for
-coding and other everyday tasks, so I already trusted its instruction
-following, output quality, and speed. That familiarity made it the practical
-choice for this project: I knew how it behaved, what hardware it needed, and
-where its limitations were.
+I initially built with a larger Qwen model, then tested whether a much smaller
+model could preserve the safety behavior while reducing serving requirements.
+Qwen3.5 4B Q8 passed all high-risk scam cases and both screenshot cases in the
+ten-case evaluation, making it the practical production choice.
 
 The MTP variant was especially appealing because speculative multi-token
 prediction can improve generation speed when the draft tokens are accepted. In
-my own local workloads, quantized Qwen builds have been practical on an RTX
-3090. With lighter quantizations and suitable settings, I have seen some
-workloads use roughly 16 GB of VRAM and approach 150 tokens per second. Those
-personal observations are not presented as a universal benchmark: context
-length, quantization, GPU offload, prompt shape, and output length all change
-VRAM use and tokens per second. The repository uses the larger 17.9 GB
-`Q4_K_XL` file, and its reproducible measurements are the Modal L40S results
-recorded below.
+the deployed experiment, Qwen3.5 generated 440 draft tokens and accepted 222,
+for a 50.5% draft acceptance rate with `n_max=2`.
 
 I chose Modal because it provides a serverless GPU endpoint that scales to zero
 after inactivity and starts again on demand. That is a strong cost model for a
 demo with irregular traffic because compute is paid for when the deployment is
 actually used instead of keeping a GPU running continuously. Persistent
-Volumes avoid downloading the 17.9 GB model on every cold start, and the
-measured warm-volume load was about 12 seconds.
+Volumes avoid downloading the model and projector on every cold start.
 
 Control was another reason for using Modal. I build and pin the `llama.cpp`
 runtime, choose the model and quantization, manage the endpoint, and protect it
@@ -65,11 +56,11 @@ stack and API behavior remain under my control.
 
 ## Small-model stack
 
-The primary model is `unsloth/Qwen3.6-27B-MTP-GGUF`, using the
-`Qwen3.6-27B-UD-Q4_K_XL.gguf` quantization and `mmproj-F16.gguf` vision
-projector. At 27B parameters it stays below the hackathon's 32B limit.
+The primary model is `unsloth/Qwen3.5-4B-MTP-GGUF`, using the
+`Qwen3.5-4B-Q8_0.gguf` quantization and `mmproj-F16.gguf` vision projector.
+At 4B parameters it stays well below the hackathon's 32B limit.
 
-Modal supplies an L40S GPU and persistent model storage. A pinned,
+Modal supplies an L4 GPU and persistent model storage. A pinned,
 CUDA-enabled `llama.cpp` build runs `llama-server` and exposes an
 OpenAI-compatible endpoint. The OpenAI Python package is used only as an HTTP
 client with a custom `base_url`; no request is sent to OpenAI.
@@ -78,13 +69,12 @@ Key measured results:
 
 | Measurement | Result |
 | --- | --- |
-| Model file | 17,909,097,600 bytes |
-| Vision projector | 927,607,360 bytes |
-| Warm-volume model load | 12.03 seconds |
-| GPU memory after load | 17,909 MiB of 46,068 MiB |
-| Structured text inference | 5.27 seconds |
-| Screenshot tests | 8.94 and 9.07 seconds |
-| MTP draft acceptance | 127 of 212 tokens (59.9%) |
+| Evaluation strict passes | 9 of 10 |
+| Evaluation average score | 89.5/100 |
+| High-risk scam cases | All passed |
+| Screenshot cases | Both passed |
+| MTP draft acceptance | 222 of 440 tokens (50.5%) |
+| MTP draft limit | `n_max=2` |
 
 The full setup and measurements are documented in
 [the model experiment notes](docs/model_experiment_notes.md).
@@ -117,7 +107,7 @@ Browser
   -> OpenAI-compatible client
   -> Modal proxy-authenticated web server
   -> CUDA llama.cpp
-  -> Qwen3.6 27B MTP GGUF + vision projector
+  -> Qwen3.5 4B Q8 MTP GGUF + vision projector
 ```
 
 The verified Server mode routes are `/gradio_api/call/{api_name}` and
@@ -127,8 +117,9 @@ version and names `app.py` as its entry point.
 ## What failed and changed
 
 - Thinking mode initially consumed the 500-token output budget without
-  returning final JSON. Disabling thinking produced reliable structured
-  responses.
+  returning final JSON. The final app enables thinking with a larger budget,
+  removes the private thinking block, and validates only the final structured
+  response. An environment switch retains the lower-latency non-thinking path.
 - A dense Roman Urdu screenshot reached the original completion limit. Image
   requests now receive a larger token budget.
 - One model response suggested an unverified official-looking domain. The
@@ -212,7 +203,7 @@ tool less safe.
 - [Gradio Server mode](https://www.gradio.app/main/guides/server-mode)
 - [Gradio curl and SSE protocol](https://www.gradio.app/main/guides/querying-gradio-apps-with-curl)
 - [Hugging Face Spaces configuration](https://huggingface.co/docs/hub/spaces-config-reference)
-- [Qwen3.6 27B MTP GGUF](https://huggingface.co/unsloth/Qwen3.6-27B-MTP-GGUF)
+- [Qwen3.5 4B MTP GGUF](https://huggingface.co/unsloth/Qwen3.5-4B-MTP-GGUF)
 - [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server)
 - [Modal web servers](https://modal.com/docs/guide/webhooks)
 - [FBR fraudulent SMS warning](https://www.fbr.gov.pk/beware-fradulant-sms/152600)

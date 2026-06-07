@@ -1,106 +1,109 @@
 {
-  "model_repo": "unsloth/Qwen3.6-27B-MTP-GGUF",
-  "model_name": "qwen3.6-27b-mtp",
+  "model_repo": "unsloth/Qwen3.5-4B-MTP-GGUF",
+  "model_name": "qwen3.5-4b-q8",
+  "endpoint": "https://abidali899--pakistan-scam-checker-qwen35-4b-q8-serve.modal.run",
   "endpoint_type": "Modal-hosted llama.cpp OpenAI-compatible endpoint",
-  "generated_at": "2026-06-07",
+  "generated_at": "2026-06-08",
   "examples": {
     "text-courier": {
       "risk_label": "Likely scam",
-      "simple_explanation": "This message uses urgency and threats to force a quick payment. The URL provided is not an official Pakistan Post domain. Official couriers do not destroy parcels for minor address issues without prior contact, nor do they use suspicious short links for payments.",
+      "simple_explanation": "This message claims to be from Pakistan Post but uses a fake, shortened URL and demands immediate payment to prevent parcel destruction.",
       "red_flags": [
-        "Threat of parcel destruction to create panic",
-        "Urgency to pay 'today'",
-        "Suspicious URL (pakpost-delivery.xyz) which is not the official Pakistan Post website",
-        "Request for payment via a link rather than through official channels"
+        "Fake sender name 'PAKISTAN POST' with no official verification",
+        "Untrusted shortened link (http://pakpost-delivery.xyz)",
+        "Urgent threat to destroy the parcel",
+        "Request for immediate payment via unverified channel"
       ],
       "safe_next_steps": [
-        "Do not click the link or pay any money",
-        "Visit the official Pakistan Post website directly by typing the address into your browser",
-        "Contact Pakistan Post customer service through their official phone number or visit a local post office to verify the parcel status",
-        "Report the message as spam or fraud"
+        "Do not click the link or make any payment.",
+        "Contact the official Pakistan Post helpline or visit a local post office to verify your parcel status.",
+        "Check your official postal account or statement for any legitimate delivery updates.",
+        "Use the relevant service's official reporting channel if needed."
       ],
       "reply_draft": ""
     },
     "text-fbr": {
       "risk_label": "Likely scam",
-      "simple_explanation": "This message asks for sensitive personal information (CNIC and bank card details) via a link, which is a common tactic used by scammers to steal money or identity. The Federal Board of Revenue (FBR) does not request bank card details or CNIC numbers through unsolicited SMS links for refunds.",
+      "simple_explanation": "This message claims a government refund but requests sensitive personal data and a payment link, which are classic signs of a financial scam.",
       "red_flags": [
-        "Requests sensitive personal data (CNIC and bank card details)",
-        "Urgency to act 'today'",
-        "Unsolicited offer of money",
-        "Use of a link to submit private information"
+        "Requests submission of CNIC and bank card details",
+        "Uses urgency ('today') to pressure action",
+        "Claims a government refund without official verification",
+        "Directs user to an untrusted link for payment"
       ],
       "safe_next_steps": [
-        "Do not click the link.",
-        "Do not share your CNIC or bank card details.",
-        "Delete the message.",
-        "If you are unsure about a tax refund, contact the FBR directly through their official website or visit a tax office in person."
+        "Do not click the link or share any personal or financial information.",
+        "Verify refund eligibility only through the official FBR website or app.",
+        "Contact the Federal Board of Revenue directly using their official helpline.",
+        "Report the message to your mobile carrier and relevant authorities."
       ],
       "reply_draft": ""
     },
     "text-bank": {
       "risk_label": "Likely scam",
-      "simple_explanation": "This message is a classic phishing attempt. Banks like HBL will never ask you to share your OTP (One-Time Password) with anyone. OTPs are secret codes meant only for you to verify your identity. Sharing it gives scammers access to your account.",
+      "simple_explanation": "This message is a classic phishing attempt impersonating HBL to steal the user's OTP.",
       "red_flags": [
-        "Request to share OTP: Legitimate banks never ask for OTPs via SMS, email, or phone calls.",
-        "Urgency and threat: The message uses fear ('account will be suspended') to rush you into acting without thinking.",
-        "Impersonation: It claims to be from 'HBL Security' but uses unofficial communication methods."
+        "Impersonation of a bank (HBL) with a false threat of account suspension.",
+        "Request for the OTP (One-Time Password), which is a critical security credential.",
+        "Urgent language demanding immediate action to create panic.",
+        "Untrusted sender claiming to be bank support without official verification."
       ],
       "safe_next_steps": [
-        "Do NOT share the OTP with anyone.",
-        "Do NOT click any links or call any numbers provided in the message.",
-        "Log in to your HBL account directly through the official mobile app or website to check your status.",
-        "If you are worried, call HBL's official customer care number from their official website or your bank card.",
-        "Block the sender's number."
+        "Do not share the OTP or any personal data with anyone.",
+        "Contact HBL directly through their official website or verified helpline number.",
+        "Use the relevant service's official reporting channel if needed.",
+        "Monitor your bank account for unauthorized transactions."
       ],
       "reply_draft": ""
     },
     "image-courier": {
       "risk_label": "Likely scam",
-      "simple_explanation": "This message shows several signs of a scam. It uses a random word ('Leopards') instead of a courier company name, comes from a personal mobile number, and includes a suspicious short link. Legitimate courier services do not use short links for address updates.",
+      "simple_explanation": "This message claims a package delivery failed and demands an address update via a shortened link, which is a common scam tactic to steal personal data or charge fees.",
       "red_flags": [
-        "Sender is a personal mobile number (+92 329...), not an official business line.",
-        "The message starts with a random word ('Leopards') instead of a recognized courier company name.",
-        "It contains a suspicious short link (cutt.ly) which is often used to hide malicious URLs.",
-        "The threat of returning the package is a common tactic to create urgency."
+        "Untrusted shortened link (cut.ly) for address update",
+        "Urgent threat of package return",
+        "Unknown sender with generic name 'Leopards'",
+        "Request to update address outside normal channels"
       ],
       "safe_next_steps": [
-        "Do not click the link in the message.",
-        "Do not reply to the sender.",
-        "If you are expecting a package, contact the courier company directly using their official website or phone number to check the status.",
-        "Delete the message."
+        "Do not click the link or update your address.",
+        "Contact your actual courier company using their official website or app.",
+        "Verify the sender's identity through official channels.",
+        "Report the message to your mobile carrier or local authorities."
       ],
       "reply_draft": ""
     },
     "image-mobile": {
       "risk_label": "Likely scam",
-      "simple_explanation": "This message shows strong signs of a common marketplace scam. The buyer is asking to move the conversation to WhatsApp immediately and mentions a 'cousin in Pakistan.' Scammers often use this story to claim they will send money via a courier or bank transfer, then ask you to pay a fake 'fee' or 'tax' to release the funds. They may also try to get you to pay for shipping upfront. Never share personal details or send money to release a payment.",
+      "simple_explanation": "This message shows a marketplace buyer using a 'cousin' story to move the conversation to WhatsApp with a foreign number (+234), which is a known scam pattern.",
       "red_flags": [
-        "Request to move chat to WhatsApp immediately",
-        "Story about a 'cousin in Pakistan' (common scam script)",
-        "Likely intent to request upfront fees or taxes later"
+        "Marketplace buyer using a relative/cousin story",
+        "Request to continue negotiation on WhatsApp",
+        "Visible foreign phone number (+234)",
+        "Attempt to move transaction off-platform"
       ],
       "safe_next_steps": [
-        "Do not reply to the WhatsApp number.",
-        "Block the user on the marketplace app.",
-        "Report the message as spam or scam to the app administrators.",
-        "Never send money to 'release' a payment."
+        "Do not share personal details or payment info on WhatsApp.",
+        "Complete the transaction only within the official marketplace platform.",
+        "Report the message to the marketplace support team.",
+        "Block the sender if they attempt further contact."
       ],
       "reply_draft": ""
     },
     "image-traffic": {
       "risk_label": "Likely scam",
-      "simple_explanation": "This message is a scam. EasyPaisa is a mobile wallet service and does not issue traffic violation fines. The message uses a shortened link to trick you into clicking, which could steal your money or personal information.",
+      "simple_explanation": "This message claims a traffic fine is overdue and demands immediate payment via a shortened link, which is a common pattern for financial fraud.",
       "red_flags": [
-        "Wrong sender: EasyPaisa does not handle traffic fines.",
-        "Suspicious link: The message contains a shortened URL (https://ly1.mk/...) which is commonly used by scammers to hide the real destination.",
-        "Urgency: The message tries to scare you into acting quickly by mentioning 'legal action'."
+        "Claims of overdue fine requiring immediate payment",
+        "Shortened URL (v1.mk) used to bypass link inspection",
+        "Sender number (+92 320...) is not an official government or Easypaisa contact",
+        "Urgent tone to pressure the user into acting quickly"
       ],
       "safe_next_steps": [
-        "Do not click the link.",
-        "Do not reply to the message.",
-        "Delete the message.",
-        "If you have a traffic fine, check the official Punjab Traffic Police website or visit a local traffic police office."
+        "Do not click the link or provide any payment information.",
+        "Contact your local traffic police or the official Easypaisi customer care via verified channels.",
+        "Check your official Easypaisi app or bank statement for any legitimate notifications.",
+        "Use the relevant service's official reporting channel if needed."
       ],
       "reply_draft": ""
     }

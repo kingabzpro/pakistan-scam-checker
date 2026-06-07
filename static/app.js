@@ -125,9 +125,9 @@ function renderResult(payload) {
   }
 
   elements.source.textContent = payload.source === "model"
-    ? "Analyzed by the deployed Qwen model endpoint."
+    ? "Analyzed by the deployed Qwen3.5 4B model endpoint."
     : payload.source === "cached_modal_example"
-      ? "Cached Modal result"
+      ? "Cached model result"
       : "";
   elements.source.classList.toggle(
     "cached-result",

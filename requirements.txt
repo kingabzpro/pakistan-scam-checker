@@ -1,2 +1,3 @@
 gradio==6.15.1
 openai==2.33.0
+huggingface_hub==1.18.0

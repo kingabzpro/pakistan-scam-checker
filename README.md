@@ -68,6 +68,10 @@ OpenAI-compatible endpoint. It does not call OpenAI cloud APIs by default.
 | `MODEL_TIMEOUT_SECONDS` | Optional request timeout; default is 180 seconds |
 | `MODAL_PROXY_KEY` | Optional Modal proxy authentication key |
 | `MODAL_PROXY_SECRET` | Optional Modal proxy authentication secret |
+| `HF_TOKEN` | Scoped Hugging Face token used by the background trace uploader |
+| `HF_TRACE_DATASET_REPO` | Trace dataset repo; defaults to `build-small-hackathon/pakistan-notice-helper-traces` |
+| `TRACE_BATCH_SIZE` | Trace records per shard; default is 20 |
+| `TRACE_FLUSH_SECONDS` | Maximum batching delay; default is 60 seconds |
 
 The current defaults are:
 
@@ -115,6 +119,37 @@ unsloth/Qwen3.6-27B-MTP-GGUF
 All frontend assets are local. The app has no runtime CDN, analytics, OCR, MCP,
 or OpenAI Agents SDK. Analysis currently depends on the deployed Modal model.
 
+## Sharing is Caring: Open Pipeline Traces
+
+The app publishes optional privacy-safe backend traces to
+[`build-small-hackathon/pakistan-notice-helper-traces`](https://huggingface.co/datasets/build-small-hackathon/pakistan-notice-helper-traces).
+The checkbox is visible and enabled by default on each request, and users can
+turn it off before submitting.
+
+Trace creation is deterministic Python logic and makes no additional model
+request. It records the actual pipeline stages, cache/Modal status, duration
+buckets, fixed signal categories, result counts, and sanitized failure types.
+It never stores raw or redacted messages, screenshots, links, identifiers,
+model explanations, reply text, exceptions, or credentials.
+
+Safe records are queued without blocking the response, written in batches of
+20 or after 60 seconds, and uploaded as unique JSONL shards. Hub failures leave
+the shard pending for a later retry and do not affect scam analysis.
+
+Operator commands:
+
+```bash
+python scripts/seed_trace_dataset.py
+python scripts/validate_traces.py data/trace_samples.jsonl
+python scripts/create_trace_dataset.py --dry-run
+python scripts/create_trace_dataset.py
+python scripts/export_pending_traces.py --dry-run
+python scripts/upload_trace_shards.py --dry-run
+```
+
+See [the dataset card](docs/trace_dataset_card.md) for the schema, privacy
+policy, provenance, and limitations.
+
 ## Hugging Face Spaces
 
 Push this repository to a new Gradio Space. The metadata at the top of this
@@ -127,7 +162,8 @@ available as overrides for a future local deployment.
 
 - Submitted text and images are sent to the configured Modal endpoint and are
   not saved by this app.
-- The `traces/` directory contains only a placeholder; runtime tracing is off.
+- Public traces contain only allow-listed metadata, buckets, booleans, counts,
+  and fixed summaries. Tracing can be disabled per request.
 - Do not upload private personal data unless you trust the Modal deployment.
 - No automated result proves that a notice is genuine or fraudulent.
 - Image analysis requires a multimodal endpoint with its vision projector.
@@ -145,9 +181,15 @@ docs/
   research_notes.md
   model_experiment_notes.md
 data/
-  examples.jsonl
-sample_inputs/
+  example_assessments.json
+  trace_samples.jsonl
 traces/
+scripts/
+  create_trace_dataset.py
+  seed_trace_dataset.py
+  validate_traces.py
+  export_pending_traces.py
+  upload_trace_shards.py
 static/
   index.html
   styles.css
@@ -156,9 +198,8 @@ experiments/
   modal_qwen36_mtp/
 ```
 
-Existing public and synthetic examples in `data/examples.jsonl` cover courier,
-traffic challan, bank, FBR, wallet, job, utility, WhatsApp, and education scam
-patterns. Source screenshots are stored under `sample_inputs/`.
+The six bundled examples have cached Modal assessments and deterministic seed
+traces. Runtime trace shards are kept out of Git and uploaded separately.
 
 ## Official reporting channels
 

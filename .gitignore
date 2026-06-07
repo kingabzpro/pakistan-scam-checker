@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Privacy-safe runtime trace shards are uploaded separately.
+traces/pending/
+traces/export/

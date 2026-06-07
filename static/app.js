@@ -15,6 +15,7 @@ const elements = {
   source: document.querySelector("#resultSource"),
   uploadHint: document.querySelector("#uploadHint"),
   textHint: document.querySelector("#textHint"),
+  saveTrace: document.querySelector("#saveTrace"),
 };
 
 let imageDataUrl = "";
@@ -250,7 +251,7 @@ elements.form.addEventListener("submit", async (event) => {
     const submittedImage = activeExampleId ? "" : imageDataUrl;
     renderResult(await callGradioApi(
       "analyze",
-      [elements.text.value, submittedImage, activeExampleId],
+      [elements.text.value, submittedImage, activeExampleId, elements.saveTrace.checked],
     ));
   } catch (error) {
     showError(error.message || "The request could not be completed.");

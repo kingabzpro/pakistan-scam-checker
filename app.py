@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from gradio import Server
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
+from trace_runtime import queue_trace, start_trace_worker, trace_status
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
@@ -176,18 +177,33 @@ def load_example_cache() -> dict[str, dict[str, Any]]:
 EXAMPLE_ASSESSMENTS = load_example_cache()
 
 
-def parse_model_json(content: str) -> dict[str, Any]:
+def parse_model_json(
+    content: str, telemetry: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    telemetry = telemetry if telemetry is not None else {}
     candidate = content.strip()
     if candidate.startswith("```"):
         candidate = re.sub(r"^```(?:json)?\s*", "", candidate, flags=re.I)
         candidate = re.sub(r"\s*```$", "", candidate)
+    parse_started = time.perf_counter()
     try:
-        return normalize_assessment(json.loads(candidate))
+        value = json.loads(candidate)
     except json.JSONDecodeError:
         match = re.search(r"\{.*\}", candidate, re.S)
         if not match:
             raise ValueError("Model did not return JSON.") from None
-        return normalize_assessment(json.loads(match.group(0)))
+        value = json.loads(match.group(0))
+    telemetry["parse_ms"] = (time.perf_counter() - parse_started) * 1000
+    telemetry["parse_completed"] = True
+    normalize_started = time.perf_counter()
+    try:
+        result = normalize_assessment(value)
+    finally:
+        telemetry["normalize_ms"] = (
+            time.perf_counter() - normalize_started
+        ) * 1000
+    telemetry["normalize_completed"] = True
+    return result
 
 
 def create_model_client() -> tuple[OpenAI, str]:
@@ -215,7 +231,12 @@ def create_model_client() -> tuple[OpenAI, str]:
     )
 
 
-def call_model(text: str, image_data_url: str) -> dict[str, Any]:
+def call_model(
+    text: str,
+    image_data_url: str,
+    telemetry: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    telemetry = telemetry if telemetry is not None else {}
     client, model_name = create_model_client()
     prompt = (
         "Assess the following Pakistani notice or message for scam risk. "
@@ -233,8 +254,22 @@ def call_model(text: str, image_data_url: str) -> dict[str, Any]:
 
     retries = max(1, int(os.getenv("MODEL_MAX_ATTEMPTS", "4")))
     retry_delay = max(0.0, float(os.getenv("MODEL_RETRY_DELAY_SECONDS", "5")))
+    telemetry.update(
+        {
+            "modal_called": False,
+            "modal_ms": 0.0,
+            "retry_count": 0,
+            "attempt_count": 0,
+            "parse_ms": 0.0,
+            "normalize_ms": 0.0,
+        }
+    )
     for attempt in range(1, retries + 1):
+        telemetry["attempt_count"] = attempt
+        telemetry["retry_count"] = attempt - 1
         try:
+            request_started = time.perf_counter()
+            telemetry["modal_called"] = True
             completion = client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -253,16 +288,27 @@ def call_model(text: str, image_data_url: str) -> dict[str, Any]:
                 },
                 extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
+            telemetry["modal_ms"] += (
+                time.perf_counter() - request_started
+            ) * 1000
             raw = completion.choices[0].message.content
             if not raw:
                 raise ValueError("Model returned an empty response.")
-            return parse_model_json(raw)
+            return parse_model_json(raw, telemetry)
         except APIStatusError as exc:
+            telemetry["modal_ms"] += max(
+                0.0,
+                (time.perf_counter() - request_started) * 1000,
+            )
             if exc.status_code == 503 and attempt < retries:
                 time.sleep(retry_delay)
                 continue
             raise
         except (APIConnectionError, APITimeoutError):
+            telemetry["modal_ms"] += max(
+                0.0,
+                (time.perf_counter() - request_started) * 1000,
+            )
             if attempt == retries:
                 raise
             time.sleep(retry_delay)
@@ -271,55 +317,184 @@ def call_model(text: str, image_data_url: str) -> dict[str, Any]:
 
 
 def analyze_notice(
-    text: str = "", image_data_url: str = "", example_id: str = ""
+    text: str = "",
+    image_data_url: str = "",
+    example_id: str = "",
+    save_trace: bool = True,
 ) -> dict[str, Any]:
     """Analyze supplied text/image using the configured model only."""
+    request_started = time.perf_counter()
+    pipeline_status = {step: "skipped" for step in (
+        "receive",
+        "validate",
+        "cache_lookup",
+        "modal_request",
+        "parse_json",
+        "normalize_result",
+        "reply_filter",
+        "response",
+    )}
+    pipeline_ms: dict[str, float] = {}
+    pipeline_status["receive"] = "completed"
     text = (text or "").strip()
     image_data_url = image_data_url or ""
     example_id = (example_id or "").strip()
+
+    def finish(
+        response: dict[str, Any],
+        *,
+        request_source: str,
+        telemetry: dict[str, Any] | None = None,
+        failure_category: str = "none",
+        failure_stage: str = "none",
+    ) -> dict[str, Any]:
+        telemetry = telemetry or {}
+        pipeline_status["response"] = "completed"
+        pipeline_ms["response"] = (time.perf_counter() - request_started) * 1000
+        if save_trace:
+            trace_id, queued = queue_trace(
+                text=text,
+                image_data_url=image_data_url,
+                example_id=example_id,
+                request_source=request_source,
+                pipeline_status=pipeline_status,
+                pipeline_ms=pipeline_ms,
+                modal_called=bool(telemetry.get("modal_called", False)),
+                modal_ms=float(telemetry.get("modal_ms", 0.0)),
+                retry_count=int(telemetry.get("retry_count", 0)),
+                assessment=response.get("assessment"),
+                failure_category=failure_category,
+                failure_stage=failure_stage,
+            )
+            response["trace"] = {"trace_id": trace_id, "status": queued}
+        else:
+            response["trace"] = {"trace_id": "", "status": "disabled"}
+        return response
+
+    validation_started = time.perf_counter()
+    valid_example = example_id in EXAMPLE_ASSESSMENTS
+    if not text and not image_data_url and not valid_example:
+        pipeline_status["validate"] = "rejected"
+        pipeline_ms["validate"] = (time.perf_counter() - validation_started) * 1000
+        return finish(
+            {
+                "ok": False,
+                "error": "Paste a message or upload a screenshot to continue.",
+                "status": model_status(),
+            },
+            request_source="user",
+            failure_category="validation_empty",
+            failure_stage="validate",
+        )
+    pipeline_status["validate"] = "completed"
+    pipeline_ms["validate"] = (time.perf_counter() - validation_started) * 1000
+
+    cache_started = time.perf_counter()
     if example_id in EXAMPLE_ASSESSMENTS:
-        return {
-            "ok": True,
-            "assessment": dict(EXAMPLE_ASSESSMENTS[example_id]),
-            "status": model_status(),
-            "source": "cached_modal_example",
-        }
-    if not text and not image_data_url:
-        return {
-            "ok": False,
-            "error": "Paste a message or upload a screenshot to continue.",
-            "status": model_status(),
-        }
+        pipeline_status["cache_lookup"] = "hit"
+        pipeline_ms["cache_lookup"] = (time.perf_counter() - cache_started) * 1000
+        pipeline_status["reply_filter"] = "completed"
+        return finish(
+            {
+                "ok": True,
+                "assessment": dict(EXAMPLE_ASSESSMENTS[example_id]),
+                "status": model_status(),
+                "source": "cached_modal_example",
+            },
+            request_source="cached_modal_example",
+        )
+    pipeline_status["cache_lookup"] = "miss"
+    pipeline_ms["cache_lookup"] = (time.perf_counter() - cache_started) * 1000
 
     status = model_status()
     if not status["connected"]:
-        return {
-            "ok": False,
-            "error": (
-                "The Modal model requires MODAL_PROXY_KEY and "
-                "MODAL_PROXY_SECRET. Add them as environment variables or "
-                "Hugging Face Space secrets."
-            ),
-            "status": status,
-        }
+        pipeline_status["modal_request"] = "skipped"
+        return finish(
+            {
+                "ok": False,
+                "error": (
+                    "The Modal model requires MODAL_PROXY_KEY and "
+                    "MODAL_PROXY_SECRET. Add them as environment variables or "
+                    "Hugging Face Space secrets."
+                ),
+                "status": status,
+            },
+            request_source="user",
+            failure_category="credentials_missing",
+            failure_stage="modal_request",
+        )
+    telemetry: dict[str, Any] = {}
     try:
-        result = call_model(text, image_data_url)
-        return {"ok": True, "assessment": result, "status": status, "source": "model"}
+        result = call_model(text, image_data_url, telemetry)
+        pipeline_status["modal_request"] = "completed"
+        pipeline_status["parse_json"] = "completed"
+        pipeline_status["normalize_result"] = "completed"
+        pipeline_status["reply_filter"] = "completed"
+        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
+        pipeline_ms["parse_json"] = float(telemetry.get("parse_ms", 0.0))
+        pipeline_ms["normalize_result"] = float(telemetry.get("normalize_ms", 0.0))
+        return finish(
+            {
+                "ok": True,
+                "assessment": result,
+                "status": status,
+                "source": "model",
+            },
+            request_source="user",
+            telemetry=telemetry,
+        )
     except APIStatusError as exc:
+        pipeline_status["modal_request"] = "failed"
+        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
         message = (
             "The Modal model rejected the request. Check the proxy credentials."
             if exc.status_code in {401, 403}
             else f"The Modal model returned HTTP {exc.status_code}. Try again shortly."
         )
-    except (APIConnectionError, APITimeoutError):
+        failure_category = "http_auth" if exc.status_code in {401, 403} else "http_error"
+    except APITimeoutError:
+        pipeline_status["modal_request"] = "failed"
+        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
         message = "The Modal model is unavailable or still starting. Try again shortly."
+        failure_category = "timeout"
+    except APIConnectionError:
+        pipeline_status["modal_request"] = "failed"
+        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
+        message = "The Modal model is unavailable or still starting. Try again shortly."
+        failure_category = "connection_error"
     except (ValueError, RuntimeError):
+        pipeline_status["modal_request"] = (
+            "completed" if telemetry.get("modal_called") else "skipped"
+        )
+        pipeline_ms["modal_request"] = float(telemetry.get("modal_ms", 0.0))
+        pipeline_ms["parse_json"] = float(telemetry.get("parse_ms", 0.0))
+        pipeline_ms["normalize_result"] = float(
+            telemetry.get("normalize_ms", 0.0)
+        )
+        if telemetry.get("parse_completed"):
+            pipeline_status["parse_json"] = "completed"
+            pipeline_status["normalize_result"] = "failed"
+            failure_stage = "normalize_result"
+        else:
+            pipeline_status["parse_json"] = "failed"
+            failure_stage = "parse_json"
         message = "The model returned an invalid response. Please try again."
-    return {
-        "ok": False,
-        "error": message,
-        "status": {**status, "connected": False, "label": "Modal model unavailable"},
-    }
+        failure_category = "invalid_model_output"
+    return finish(
+        {
+            "ok": False,
+            "error": message,
+            "status": {**status, "connected": False, "label": "Modal model unavailable"},
+        },
+        request_source="user",
+        telemetry=telemetry,
+        failure_category=failure_category,
+        failure_stage=(
+            failure_stage
+            if failure_category == "invalid_model_output"
+            else "modal_request"
+        ),
+    )
 
 
 app = Server()
@@ -328,14 +503,22 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 @app.api(name="analyze", description="Assess a notice for common scam signals.", concurrency_limit=1)
 def analyze_api(
-    text: str = "", image_data_url: str = "", example_id: str = ""
+    text: str = "",
+    image_data_url: str = "",
+    example_id: str = "",
+    save_trace: bool = True,
 ) -> dict[str, Any]:
-    return analyze_notice(text, image_data_url, example_id)
+    return analyze_notice(text, image_data_url, example_id, save_trace)
 
 
 @app.api(name="status", description="Return model and privacy status.", queue=False)
 def status_api() -> dict[str, Any]:
     return model_status()
+
+
+@app.api(name="trace_status", description="Return privacy-safe trace queue status.", queue=False)
+def trace_status_api() -> dict[str, Any]:
+    return trace_status()
 
 
 @app.get("/", include_in_schema=False)
@@ -382,11 +565,11 @@ def run_self_tests() -> None:
         }
     )
     assert inappropriate["reply_draft"] == ""
-    cached = analyze_notice(example_id="text-bank")
+    cached = analyze_notice(example_id="text-bank", save_trace=False)
     assert cached["ok"] is True
     assert cached["source"] == "cached_modal_example"
     assert cached["assessment"]["risk_label"] == "Likely scam"
-    assert analyze_notice("", "")["ok"] is False
+    assert analyze_notice("", "", save_trace=False)["ok"] is False
     try:
         normalize_assessment({"risk_label": "Looks normal"})
     except ValueError:
@@ -431,6 +614,7 @@ def main() -> int:
         if args.test_endpoint:
             test_endpoint()
             return 0
+        start_trace_worker()
         app.launch(server_name=args.host, server_port=args.port)
         return 0
     except (

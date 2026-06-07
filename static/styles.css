@@ -136,6 +136,14 @@ textarea:disabled { opacity: .45; background: #f0f5f2; cursor: not-allowed; }
 .form-actions { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 26px; }
 .form-error { display: none; margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: #fff0ef; color: #8d2722; font-size: 13px; }
 .form-error.visible { display: block; }
+.trace-consent {
+  margin-top: 18px; padding: 13px 15px; display: flex; align-items: flex-start; gap: 11px;
+  border: 1px solid var(--line); border-radius: 14px; background: #f8fbf9; cursor: pointer;
+}
+.trace-consent input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--green-700); }
+.trace-consent span, .trace-consent strong, .trace-consent small { display: block; }
+.trace-consent strong { color: var(--green-950); font-size: 13px; }
+.trace-consent small { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 
 .mode-hint {
   display: none; margin-top: 10px; padding: 8px 14px; border-radius: 10px;

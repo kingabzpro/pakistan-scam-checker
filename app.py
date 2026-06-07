@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from gradio import Server
 from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
-from trace_runtime import queue_trace, start_trace_worker, trace_status
+from traces.runtime import queue_trace, start_trace_worker, trace_status
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"

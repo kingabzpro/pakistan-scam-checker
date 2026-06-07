@@ -139,15 +139,15 @@ the shard pending for a later retry and do not affect scam analysis.
 Operator commands:
 
 ```bash
-python scripts/seed_trace_dataset.py
-python scripts/validate_traces.py data/trace_samples.jsonl
-python scripts/create_trace_dataset.py --dry-run
-python scripts/create_trace_dataset.py
-python scripts/export_pending_traces.py --dry-run
-python scripts/upload_trace_shards.py --dry-run
+python -m traces.scripts.seed_trace_dataset
+python -m traces.scripts.validate_traces
+python -m traces.scripts.create_trace_dataset --dry-run
+python -m traces.scripts.create_trace_dataset
+python -m traces.scripts.export_pending_traces --dry-run
+python -m traces.scripts.upload_trace_shards --dry-run
 ```
 
-See [the dataset card](docs/trace_dataset_card.md) for the schema, privacy
+See [the dataset card](traces/dataset_card.md) for the schema, privacy
 policy, provenance, and limitations.
 
 ## Hugging Face Spaces
@@ -182,14 +182,17 @@ docs/
   model_experiment_notes.md
 data/
   example_assessments.json
-  trace_samples.jsonl
 traces/
-scripts/
-  create_trace_dataset.py
-  seed_trace_dataset.py
-  validate_traces.py
-  export_pending_traces.py
-  upload_trace_shards.py
+  runtime.py
+  dataset_card.md
+  data/
+    trace_samples.jsonl
+  scripts/
+    create_trace_dataset.py
+    seed_trace_dataset.py
+    validate_traces.py
+    export_pending_traces.py
+    upload_trace_shards.py
 static/
   index.html
   styles.css

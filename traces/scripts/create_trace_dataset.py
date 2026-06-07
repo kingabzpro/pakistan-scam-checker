@@ -8,7 +8,8 @@ from pathlib import Path
 
 from huggingface_hub import HfApi
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+TRACE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_REPO = "build-small-hackathon/pakistan-notice-helper-traces"
 
 
@@ -21,8 +22,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     files = {
-        ROOT / "docs" / "trace_dataset_card.md": "README.md",
-        ROOT / "data" / "trace_samples.jsonl": "data/seed/trace_samples.jsonl",
+        TRACE_DIR / "dataset_card.md": "README.md",
+        TRACE_DIR / "data" / "trace_samples.jsonl": "data/seed/trace_samples.jsonl",
     }
     if args.dry_run:
         print(f"Would create public dataset: {args.repo_id}")

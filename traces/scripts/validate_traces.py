@@ -7,10 +7,11 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+TRACE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from trace_runtime import validate_trace
+from traces.runtime import validate_trace
 
 
 def validate_file(path: Path) -> tuple[int, list[str]]:
@@ -37,7 +38,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="*", type=Path)
     args = parser.parse_args()
-    paths = args.paths or [ROOT / "data" / "trace_samples.jsonl"]
+    paths = args.paths or [TRACE_DIR / "data" / "trace_samples.jsonl"]
     total = 0
     all_errors: list[str] = []
     for path in paths:

@@ -7,10 +7,11 @@ import json
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+TRACE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from trace_runtime import PIPELINE_STEPS, build_trace_record, validate_trace
+from traces.runtime import PIPELINE_STEPS, build_trace_record, validate_trace
 
 TEXT_EXAMPLES = {
     "text-courier": (
@@ -84,7 +85,7 @@ def main() -> int:
     parser.add_argument(
         "--output",
         type=Path,
-        default=ROOT / "data" / "trace_samples.jsonl",
+        default=TRACE_DIR / "data" / "trace_samples.jsonl",
     )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()

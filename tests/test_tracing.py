@@ -14,7 +14,7 @@ import httpx
 from openai import APIStatusError, APITimeoutError
 
 import app
-import trace_runtime
+from traces import runtime as trace_runtime
 
 
 class TraceTests(unittest.TestCase):
@@ -281,7 +281,7 @@ class TraceTests(unittest.TestCase):
         ), patch.dict("os.environ", {"HF_TOKEN": "test-token"}), patch(
             "huggingface_hub.HfApi.upload_file",
             side_effect=RuntimeError("offline"),
-        ), patch("trace_runtime.time.sleep"):
+        ), patch("traces.runtime.time.sleep"):
             publisher._persist_batch([self.sample_record()])
             publisher._upload_pending()
             self.assertEqual(len(list(Path(directory).glob("*.jsonl"))), 1)

@@ -10,11 +10,11 @@ from pathlib import Path
 
 from huggingface_hub import HfApi
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from scripts.validate_traces import validate_file
-from trace_runtime import DATASET_REPO, PENDING_DIR
+from traces.runtime import DATASET_REPO, PENDING_DIR
+from traces.scripts.validate_traces import validate_file
 
 
 def main() -> int:

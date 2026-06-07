@@ -125,9 +125,13 @@ function renderResult(payload) {
 
   elements.source.textContent = payload.source === "model"
     ? "Analyzed by the deployed Qwen model endpoint."
-    : payload.source === "cached_example"
-      ? "Loaded from a precomputed example assessment. No model request was made."
+    : payload.source === "cached_modal_example"
+      ? "Cached Modal result"
       : "";
+  elements.source.classList.toggle(
+    "cached-result",
+    payload.source === "cached_modal_example",
+  );
   elements.results.hidden = false;
   elements.results.scrollIntoView({ behavior: "smooth", block: "start" });
 }

@@ -1,0 +1,108 @@
+{
+  "model_repo": "unsloth/Qwen3.6-27B-MTP-GGUF",
+  "model_name": "qwen3.6-27b-mtp",
+  "endpoint_type": "Modal-hosted llama.cpp OpenAI-compatible endpoint",
+  "generated_at": "2026-06-07",
+  "examples": {
+    "text-courier": {
+      "risk_label": "Likely scam",
+      "simple_explanation": "This message uses urgency and threats to force a quick payment. The URL provided is not an official Pakistan Post domain. Official couriers do not destroy parcels for minor address issues without prior contact, nor do they use suspicious short links for payments.",
+      "red_flags": [
+        "Threat of parcel destruction to create panic",
+        "Urgency to pay 'today'",
+        "Suspicious URL (pakpost-delivery.xyz) which is not the official Pakistan Post website",
+        "Request for payment via a link rather than through official channels"
+      ],
+      "safe_next_steps": [
+        "Do not click the link or pay any money",
+        "Visit the official Pakistan Post website directly by typing the address into your browser",
+        "Contact Pakistan Post customer service through their official phone number or visit a local post office to verify the parcel status",
+        "Report the message as spam or fraud"
+      ],
+      "reply_draft": ""
+    },
+    "text-fbr": {
+      "risk_label": "Likely scam",
+      "simple_explanation": "This message asks for sensitive personal information (CNIC and bank card details) via a link, which is a common tactic used by scammers to steal money or identity. The Federal Board of Revenue (FBR) does not request bank card details or CNIC numbers through unsolicited SMS links for refunds.",
+      "red_flags": [
+        "Requests sensitive personal data (CNIC and bank card details)",
+        "Urgency to act 'today'",
+        "Unsolicited offer of money",
+        "Use of a link to submit private information"
+      ],
+      "safe_next_steps": [
+        "Do not click the link.",
+        "Do not share your CNIC or bank card details.",
+        "Delete the message.",
+        "If you are unsure about a tax refund, contact the FBR directly through their official website or visit a tax office in person."
+      ],
+      "reply_draft": ""
+    },
+    "text-bank": {
+      "risk_label": "Likely scam",
+      "simple_explanation": "This message is a classic phishing attempt. Banks like HBL will never ask you to share your OTP (One-Time Password) with anyone. OTPs are secret codes meant only for you to verify your identity. Sharing it gives scammers access to your account.",
+      "red_flags": [
+        "Request to share OTP: Legitimate banks never ask for OTPs via SMS, email, or phone calls.",
+        "Urgency and threat: The message uses fear ('account will be suspended') to rush you into acting without thinking.",
+        "Impersonation: It claims to be from 'HBL Security' but uses unofficial communication methods."
+      ],
+      "safe_next_steps": [
+        "Do NOT share the OTP with anyone.",
+        "Do NOT click any links or call any numbers provided in the message.",
+        "Log in to your HBL account directly through the official mobile app or website to check your status.",
+        "If you are worried, call HBL's official customer care number from their official website or your bank card.",
+        "Block the sender's number."
+      ],
+      "reply_draft": ""
+    },
+    "image-courier": {
+      "risk_label": "Likely scam",
+      "simple_explanation": "This message shows several signs of a scam. It uses a random word ('Leopards') instead of a courier company name, comes from a personal mobile number, and includes a suspicious short link. Legitimate courier services do not use short links for address updates.",
+      "red_flags": [
+        "Sender is a personal mobile number (+92 329...), not an official business line.",
+        "The message starts with a random word ('Leopards') instead of a recognized courier company name.",
+        "It contains a suspicious short link (cutt.ly) which is often used to hide malicious URLs.",
+        "The threat of returning the package is a common tactic to create urgency."
+      ],
+      "safe_next_steps": [
+        "Do not click the link in the message.",
+        "Do not reply to the sender.",
+        "If you are expecting a package, contact the courier company directly using their official website or phone number to check the status.",
+        "Delete the message."
+      ],
+      "reply_draft": ""
+    },
+    "image-mobile": {
+      "risk_label": "Likely scam",
+      "simple_explanation": "This message shows strong signs of a common marketplace scam. The buyer is asking to move the conversation to WhatsApp immediately and mentions a 'cousin in Pakistan.' Scammers often use this story to claim they will send money via a courier or bank transfer, then ask you to pay a fake 'fee' or 'tax' to release the funds. They may also try to get you to pay for shipping upfront. Never share personal details or send money to release a payment.",
+      "red_flags": [
+        "Request to move chat to WhatsApp immediately",
+        "Story about a 'cousin in Pakistan' (common scam script)",
+        "Likely intent to request upfront fees or taxes later"
+      ],
+      "safe_next_steps": [
+        "Do not reply to the WhatsApp number.",
+        "Block the user on the marketplace app.",
+        "Report the message as spam or scam to the app administrators.",
+        "Never send money to 'release' a payment."
+      ],
+      "reply_draft": ""
+    },
+    "image-traffic": {
+      "risk_label": "Likely scam",
+      "simple_explanation": "This message is a scam. EasyPaisa is a mobile wallet service and does not issue traffic violation fines. The message uses a shortened link to trick you into clicking, which could steal your money or personal information.",
+      "red_flags": [
+        "Wrong sender: EasyPaisa does not handle traffic fines.",
+        "Suspicious link: The message contains a shortened URL (https://ly1.mk/...) which is commonly used by scammers to hide the real destination.",
+        "Urgency: The message tries to scare you into acting quickly by mentioning 'legal action'."
+      ],
+      "safe_next_steps": [
+        "Do not click the link.",
+        "Do not reply to the message.",
+        "Delete the message.",
+        "If you have a traffic fine, check the official Punjab Traffic Police website or visit a local traffic police office."
+      ],
+      "reply_draft": ""
+    }
+  }
+}

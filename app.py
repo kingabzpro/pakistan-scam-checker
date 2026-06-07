@@ -338,9 +338,6 @@ def analyze_notice(
                 text=text,
                 image_data_url=image_data_url,
                 example_id=example_id,
-                modal_called=bool(telemetry.get("modal_called", False)),
-                modal_ms=float(telemetry.get("modal_ms", 0.0)),
-                retry_count=int(telemetry.get("retry_count", 0)),
                 assessment=response.get("assessment"),
             )
             response["trace"] = {"trace_id": trace_id, "status": queued}

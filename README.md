@@ -128,7 +128,8 @@ turn it off before submitting.
 
 Trace creation is deterministic Python logic and makes no additional model
 request. It records a safe input type or image description, input category,
-urgency, size and latency buckets, fixed signals, and result counts.
+urgency, fixed signals, and result counts. The input field uses a safe
+`text: ...` or `image: ...` description generated from fixed templates.
 It never stores raw or redacted messages, screenshots, links, identifiers,
 model explanations, reply text, exceptions, or credentials.
 

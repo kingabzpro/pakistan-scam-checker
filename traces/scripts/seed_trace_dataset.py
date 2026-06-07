@@ -49,9 +49,6 @@ def build_seed_records() -> list[dict]:
             text=text,
             image_data_url=image_placeholder,
             example_id=example_id,
-            modal_called=False,
-            modal_ms=0,
-            retry_count=0,
             assessment=assessment,
         )
         errors = validate_trace(record)

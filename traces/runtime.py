@@ -57,60 +57,6 @@ EXAMPLE_PROFILES = {
 }
 
 
-def _bucket_number(value: float, thresholds: tuple[tuple[float, str], ...]) -> str:
-    for maximum, label in thresholds:
-        if value <= maximum:
-            return label
-    return thresholds[-1][1]
-
-
-def duration_bucket(milliseconds: float) -> str:
-    return _bucket_number(
-        max(0.0, milliseconds),
-        (
-            (1, "0-1ms"),
-            (5, "2-5ms"),
-            (10, "6-10ms"),
-            (50, "11-50ms"),
-            (250, "51-250ms"),
-            (1000, "251-1000ms"),
-            (5000, "1-5s"),
-            (30000, "5-30s"),
-            (float("inf"), "30s+"),
-        ),
-    )
-
-
-def input_size_bucket(length: int) -> str:
-    return _bucket_number(
-        max(0, length),
-        (
-            (0, "empty"),
-            (160, "1-160"),
-            (500, "161-500"),
-            (2000, "501-2000"),
-            (6000, "2001-6000"),
-            (12000, "6001-12000"),
-            (float("inf"), "12000+"),
-        ),
-    )
-
-
-def image_size_bucket(data_url_length: int) -> str:
-    estimated_bytes = max(0, int(data_url_length * 0.75))
-    return _bucket_number(
-        estimated_bytes,
-        (
-            (0, "none"),
-            (100_000, "up-to-100KB"),
-            (500_000, "100-500KB"),
-            (2_000_000, "500KB-2MB"),
-            (8_000_000, "2-8MB"),
-            (float("inf"), "8MB+"),
-        ),
-    )
-
-
 def detect_signals(text: str, example_id: str = "") -> dict[str, bool]:
     detected = {
         name: bool(re.search(pattern, text or "", re.I | re.S))
@@ -147,27 +93,6 @@ def detect_category(text: str, signals: dict[str, bool], example_id: str = "") -
         return "traffic_challan"
     if signals["courier"]:
         return "courier"
-    return "unknown"
-
-
-def detect_language_hint(text: str) -> str:
-    has_urdu = bool(re.search(r"[\u0600-\u06ff]", text or ""))
-    has_latin = bool(re.search(r"[A-Za-z]", text or ""))
-    roman_terms = bool(
-        re.search(
-            r"\b(?:aap|apka|apki|hai|hain|karo|karein|paisa|rupay|bhej|jaldi)\b",
-            text or "",
-            re.I,
-        )
-    )
-    if has_urdu and has_latin:
-        return "mixed_urdu_latin"
-    if has_urdu:
-        return "urdu_script"
-    if roman_terms:
-        return "roman_urdu"
-    if has_latin:
-        return "latin_script"
     return "unknown"
 
 
@@ -213,17 +138,9 @@ def build_input_profile(text: str, image_data_url: str, example_id: str = "") ->
     signals = detect_signals(text, example_id)
     category = detect_category(text, signals, example_id)
     return {
-        "input": (
-            f"image ({safe_description(category, signals)})"
-            if input_type == "image"
-            else "text"
-        ),
+        "input": f"{input_type}: {safe_description(category, signals)}",
         "input_category": category,
         "urgency": signals["urgency"],
-        "text_character_bucket": input_size_bucket(len(text or "")),
-        "text_byte_bucket": input_size_bucket(len((text or "").encode("utf-8"))),
-        "image_size_bucket": image_size_bucket(len(image_data_url or "")),
-        "language_hint": detect_language_hint(text),
         "signals": {
             name: enabled
             for name, enabled in signals.items()
@@ -237,9 +154,6 @@ def build_trace_record(
     text: str,
     image_data_url: str,
     example_id: str,
-    modal_called: bool,
-    modal_ms: float,
-    retry_count: int,
     assessment: dict[str, Any] | None,
 ) -> dict[str, Any]:
     trace_id = str(uuid.uuid4())
@@ -251,24 +165,6 @@ def build_trace_record(
         "trace_id": trace_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         **input_profile,
-        "modal": {
-            "called": bool(modal_called),
-            "model_family": (
-                "qwen3.6-27b-mtp"
-                if "qwen3.6-27b-mtp"
-                in os.getenv("MODEL_NAME", "qwen3.6-27b-mtp").lower()
-                else "other"
-            ),
-            "latency_bucket": duration_bucket(modal_ms),
-            "retry_count": max(0, min(int(retry_count), 20)),
-            "outcome": (
-                "success"
-                if modal_called and assessment
-                else "failed"
-                if modal_called
-                else "not_called"
-            ),
-        },
         "result": {
             "risk_label": risk_label,
             "red_flag_count": min(len((assessment or {}).get("red_flags", [])), 50),
@@ -305,12 +201,7 @@ def validate_trace(record: Any) -> list[str]:
         "input",
         "input_category",
         "urgency",
-        "text_character_bucket",
-        "text_byte_bucket",
-        "image_size_bucket",
-        "language_hint",
         "signals",
-        "modal",
         "result",
         "privacy",
     }
@@ -318,12 +209,14 @@ def validate_trace(record: Any) -> list[str]:
     if missing:
         errors.append("Missing fields: " + ", ".join(sorted(missing)))
     input_value = record.get("input")
-    if input_value != "text" and not (
+    if not (
         isinstance(input_value, str)
-        and input_value.startswith("image (")
-        and input_value.endswith(")")
+        and (
+            input_value.startswith("text: ")
+            or input_value.startswith("image: ")
+        )
     ):
-        errors.append("Input must be text or a fixed image description.")
+        errors.append("Input must use a fixed text: or image: description.")
     if not isinstance(record.get("input_category"), str):
         errors.append("Input category must be a string.")
     if not isinstance(record.get("urgency"), bool):
@@ -340,6 +233,11 @@ def validate_trace(record: Any) -> list[str]:
         "pipeline_steps",
         "cache",
         "failure",
+        "text_byte_bucket",
+        "text_character_bucket",
+        "image_size_bucket",
+        "language_hint",
+        "modal",
         "raw_input",
         "raw_text",
         "image_data_url",

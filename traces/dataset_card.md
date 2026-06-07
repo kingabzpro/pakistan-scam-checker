@@ -34,18 +34,17 @@ and convert it into allow-listed categories, booleans, buckets, and counts.
 ## Fields
 
 - Trace identity: random trace ID and UTC timestamp
-- `input`: either `text` or a fixed-template `image (...)` description
+- `input`: a fixed-template `text: ...` or `image: ...` description
 - `input_category`: deterministic category such as courier, bank, or FBR
 - `urgency`: deterministic boolean urgency signal
-- Size buckets and script/language hint
 - Deterministic signals: OTP, CNIC, credentials, link, payment,
   refund/prize, courier, challan, and account threat
-- Modal-call metadata
 - Final risk label and output item counts
 - Explicit privacy flags
 
 Records do not contain pipeline steps, cache fields, app commits, failure
-details, request source, or schema-version columns.
+details, request source, schema versions, size buckets, language hints, or
+Modal metadata.
 
 ## Privacy
 

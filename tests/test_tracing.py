@@ -27,9 +27,6 @@ class TraceTests(unittest.TestCase):
             ),
             image_data_url="data:image/png;base64,PRIVATE_IMAGE_BYTES",
             example_id="",
-            modal_called=True,
-            modal_ms=120,
-            retry_count=0,
             assessment={
                 "risk_label": "Likely scam",
                 "simple_explanation": "PRIVATE MODEL EXPLANATION",
@@ -67,7 +64,7 @@ class TraceTests(unittest.TestCase):
 
     def test_trace_uses_simplified_columns(self) -> None:
         image_record = self.sample_record()
-        self.assertTrue(image_record["input"].startswith("image ("))
+        self.assertTrue(image_record["input"].startswith("image: "))
         self.assertEqual(image_record["input_category"], "unknown")
         self.assertFalse(image_record["urgency"])
         for removed in (
@@ -77,6 +74,11 @@ class TraceTests(unittest.TestCase):
             "failure",
             "schema_version",
             "request_source",
+            "text_byte_bucket",
+            "text_character_bucket",
+            "image_size_bucket",
+            "language_hint",
+            "modal",
         ):
             self.assertNotIn(removed, image_record)
 
@@ -84,12 +86,12 @@ class TraceTests(unittest.TestCase):
             text="Urgent courier payment required today",
             image_data_url="",
             example_id="",
-            modal_called=False,
-            modal_ms=0,
-            retry_count=0,
             assessment=None,
         )
-        self.assertEqual(text_record["input"], "text")
+        self.assertEqual(
+            text_record["input"],
+            "text: Courier-style content with urgency, payment, courier signals",
+        )
         self.assertEqual(text_record["input_category"], "courier")
         self.assertTrue(text_record["urgency"])
 
@@ -129,7 +131,7 @@ class TraceTests(unittest.TestCase):
             result = app.analyze_notice("test message")
         self.assertFalse(result["ok"])
         model_mock.assert_not_called()
-        self.assertFalse(queue_mock.call_args.kwargs["modal_called"])
+        self.assertNotIn("modal_called", queue_mock.call_args.kwargs)
 
     def test_success_uses_existing_model_call_once(self) -> None:
         assessment = {
@@ -162,8 +164,8 @@ class TraceTests(unittest.TestCase):
             result = app.analyze_notice("test message")
         self.assertTrue(result["ok"])
         model_mock.assert_called_once()
-        self.assertTrue(queue_mock.call_args.kwargs["modal_called"])
-        self.assertEqual(queue_mock.call_args.kwargs["retry_count"], 1)
+        self.assertNotIn("modal_called", queue_mock.call_args.kwargs)
+        self.assertNotIn("retry_count", queue_mock.call_args.kwargs)
 
     def test_timeout_is_sanitized(self) -> None:
         timeout = APITimeoutError(request=httpx.Request("POST", "https://example.invalid"))
